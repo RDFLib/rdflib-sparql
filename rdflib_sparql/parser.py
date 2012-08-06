@@ -1,23 +1,28 @@
 
 import re
 
+
 from pyparsing import Literal, Regex, Optional, OneOrMore, ZeroOrMore, \
-    Forward, ParseException, Suppress, Combine, restOfLine, Group
+    Forward, ParseException, Suppress, Combine, restOfLine, Group, Empty
 from pyparsing import CaselessKeyword as Keyword # watch out :) 
 #from pyparsing import Keyword as CaseSensitiveKeyword 
 
-from components import pname
+from parserutils import Comp, Param
+
+import rdflib_sparql.components as components
 
 import rdflib
 
 DEBUG=False
 
-class ProjectionMismatchException(Exception):
-    pass
-
 # ---------------- ACTIONS 
 
-DEBUG=False
+def neg(literal): 
+    try: 
+        return rdflib.Literal(-literal, datatype=literal.datatype)
+    except Exception, e:
+        print e
+        
 
 def setLanguage(terms):
     terms[0].language=terms[1]
@@ -96,70 +101,8 @@ def expandCollection(terms):
     return [res]
 
 
-def refer_component(component, initial_args=None, projection=None, mapfn=None, **kwargs):
-    '''
-    Create a function to forward parsing results to the appropriate
-    constructor.
 
-    The pyparsing library allows us to modify the token stream that is
-    returned by a particular expression with the `setParseAction()` method.
-    This method sets a handler function that should take a single
-    `ParseResults` instance as an argument, and then return a new token or
-    list of tokens.  Mainly, we want to pass lower level tokens to SPARQL
-    parse tree objects; the constructors for these objects take a number of
-    positional arguments, so this function builds a new function that will
-    forward the pyparsing results to the positional arguments of the
-    appropriate constructor.
-
-    This function provides a bit more functionality with its additional
-    arguments:
-
-     - `initial_args`: static list of initial arguments to add to the
-     	 beginning of the arguments list before additional processing
-     - `projection`: list of integers that reorders the initial arguments
-     	 based on the indices that it contains.
-
-    Finally, any additional keyword arguments passed to this function are
-    passed along to the handler that is constructed.
-
-    Note that we always convert pyparsing results to a list with the
-    `asList()` method before using those results; this works, but we may
-    only need this for testing.  To be safe, we include it here, but we
-    might want to investigate further whether or not it could be moved only
-    to testing code.  Also, we might want to investigate whether a list-only
-    parsing mode could be added to pyparsing.
-    '''
-
-    if initial_args is None and projection is None:
-        def __apply1(results):
-            if mapfn:
-                results=[mapfn(x) for x in results.asList()]
-            else: 
-                results=results.asList()
-
-            return component(*results, **kwargs)
-        apply = __apply1
-    else:
-        def __apply2(results):
-            if mapfn:
-                results=[mapfn(x) for x in results]
-            if initial_args is not None:
-                results = initial_args + results.asList()
-            if projection is not None:
-                if len(results) < len(projection):
-                    raise ProjectionMismatchException(
-                      'Expected at least %d results to make %s, got %d.' %
-                      (len(projection), str(component), len(results)))
-                projected = []
-                for index in projection:
-                    projected.append(results[index])
-            else:
-                projected = results
-            return component(*projected, **kwargs)
-        apply = __apply2
-    return apply
-
-# SPARQL Grammar: copied from http://www.w3.org/TR/sparql11-query/#grammar
+# SPARQL Grammar from http://www.w3.org/TR/sparql11-query/#grammar
 
 
 # ------ TERMINALS --------------
@@ -183,7 +126,7 @@ PN_CHARS_re = u'\\-0-9\u00B7\u0300-\u036F\u203F-\u2040'+PN_CHARS_U_re
 PN_PREFIX = Regex(ur'[%s](?:[%s\.]*[%s])?'%(PN_CHARS_BASE_re, PN_CHARS_re, PN_CHARS_re), flags=re.U)
 
 # [140] PNAME_NS ::= PN_PREFIX? ':'
-PNAME_NS = Combine(Optional(PN_PREFIX) + ':')
+PNAME_NS = Combine(Optional(PN_PREFIX) + Suppress(':'))
 
 # [173] PN_LOCAL_ESC ::= '\' ( '_' | '~' | '.' | '-' | '!' | '$' | '&' | "'" | '(' | ')' | '*' | '+' | ',' | ';' | '=' | '/' | '?' | '#' | '@' | '%' )
 
@@ -206,7 +149,7 @@ PN_LOCAL = Combine((Regex(u'[%s0-9:]'%PN_CHARS_U_re, flags=re.U) | PLX ) + ZeroO
 
 # [141] PNAME_LN ::= PNAME_NS PN_LOCAL
 PNAME_LN = PNAME_NS + PN_LOCAL.leaveWhitespace()
-PNAME_LN.setParseAction(lambda x: [pname(*x)])
+PNAME_LN.setParseAction(lambda x: [components.PName(*x)])
 
 # [142] BLANK_NODE_LABEL ::= '_:' ( PN_CHARS_U | [0-9] ) ((PN_CHARS|'.')* PN_CHARS)?
 BLANK_NODE_LABEL = Regex(ur'_:[0-9%s](?:[\.%s]*[%s])?'%(PN_CHARS_U_re, PN_CHARS_re, PN_CHARS_re), flags=re.U)
@@ -228,7 +171,7 @@ LANGTAG = Combine(Suppress('@')+Regex('[a-zA-Z]+(?:-[a-zA-Z0-9]+)*'))
 # [146] INTEGER ::= [0-9]+
 INTEGER = Regex(r"[0-9]+")
 #INTEGER.setResultsName('integer')
-INTEGER.setParseAction(refer_component(rdflib.Literal, datatype=rdflib.XSD.integer))
+INTEGER.setParseAction(lambda x: rdflib.Literal(x[0], datatype=rdflib.XSD.integer))
 
 # [155] EXPONENT ::= [eE] [+-]? [0-9]+
 EXPONENT_re = '[eE][+-]?[0-9]+'
@@ -236,31 +179,34 @@ EXPONENT_re = '[eE][+-]?[0-9]+'
 # [147] DECIMAL ::= [0-9]* '.' [0-9]+
 DECIMAL = Regex(r'[0-9]*\.[0-9]+') # (?![eE])
 #DECIMAL.setResultsName('decimal')
-DECIMAL.setParseAction(refer_component(rdflib.Literal, datatype=rdflib.XSD.decimal))
+DECIMAL.setParseAction(lambda x: rdflib.Literal(x[0], datatype=rdflib.XSD.decimal))
 
 # [148] DOUBLE ::= [0-9]+ '.' [0-9]* EXPONENT | '.' ([0-9])+ EXPONENT | ([0-9])+ EXPONENT
 DOUBLE = Regex(r'[0-9]+\.[0-9]*%(e)s|\.([0-9])+%(e)s|[0-9]+%(e)s'%{'e':EXPONENT_re})
 #DOUBLE.setResultsName('double')
-DOUBLE.setParseAction(refer_component(rdflib.Literal, datatype=rdflib.XSD.double))
+DOUBLE.setParseAction(lambda x: rdflib.Literal(x[0], datatype=rdflib.XSD.double))
 
 
 # [149] INTEGER_POSITIVE ::= '+' INTEGER
-INTEGER_POSITIVE = Combine(Literal('+') + INTEGER)
+INTEGER_POSITIVE = Suppress('+') + INTEGER.copy().leaveWhitespace()
 
 # [150] DECIMAL_POSITIVE ::= '+' DECIMAL
-DECIMAL_POSITIVE = Combine(Literal('+') + DECIMAL)
+DECIMAL_POSITIVE = Suppress('+') + DECIMAL.copy().leaveWhitespace()
 
 # [151] DOUBLE_POSITIVE ::= '+' DOUBLE
-DOUBLE_POSITIVE = Combine(Literal('+') + DOUBLE)
+DOUBLE_POSITIVE = Suppress('+') + DOUBLE.copy().leaveWhitespace()
 
 # [152] INTEGER_NEGATIVE ::= '-' INTEGER
-INTEGER_NEGATIVE = Combine(Literal('-') + INTEGER)
+INTEGER_NEGATIVE = Suppress('-') + INTEGER.copy().leaveWhitespace()
+INTEGER_NEGATIVE.setParseAction(lambda x: neg(x[0]))
 
 # [153] DECIMAL_NEGATIVE ::= '-' DECIMAL
-DECIMAL_NEGATIVE = Combine(Literal('-') + DECIMAL)
+DECIMAL_NEGATIVE = Suppress('-') + DECIMAL.copy().leaveWhitespace()
+DECIMAL_NEGATIVE.setParseAction(lambda x: neg(x[0]))
 
 # [154] DOUBLE_NEGATIVE ::= '-' DOUBLE
-DOUBLE_NEGATIVE = Combine(Literal('-') + DOUBLE)
+DOUBLE_NEGATIVE = Suppress('-') + DOUBLE.copy().leaveWhitespace()
+DOUBLE_NEGATIVE.setParseAction(lambda x: neg(x[0]))
 
 # [160] ECHAR ::= '\' [tbnrf\"']
 # ECHAR = Regex('\\\\[tbnrf"\']')
@@ -269,24 +215,24 @@ DOUBLE_NEGATIVE = Combine(Literal('-') + DOUBLE)
 # [158] STRING_LITERAL_LONG1 ::= "'''" ( ( "'" | "''" )? ( [^'\] | ECHAR ) )* "'''"
 #STRING_LITERAL_LONG1 = Literal("'''") + ( Optional( Literal("'") | "''" ) + ZeroOrMore( ~ Literal("'\\") | ECHAR ) ) + "'''"
 STRING_LITERAL_LONG1 = Regex(ur"'''((?:'|'')?(?:[^'\\]|\\['ntbrf\\]))*'''")
-STRING_LITERAL_LONG1.setParseAction(refer_component(rdflib.Literal, mapfn=lambda x: x[3:-3]))
+STRING_LITERAL_LONG1.setParseAction(lambda x: rdflib.Literal(x[0][3:-3]))
 
 # [159] STRING_LITERAL_LONG2 ::= '"""' ( ( '"' | '""' )? ( [^"\] | ECHAR ) )* '"""'
 #STRING_LITERAL_LONG2 = Literal('"""') + ( Optional( Literal('"') | '""' ) + ZeroOrMore( ~ Literal('"\\') | ECHAR ) ) +  '"""'
 STRING_LITERAL_LONG2 = Regex(ur'"""(?:(?:"|"")?(?:[^"\\]|\\["ntbrf\\]))*"""')
-STRING_LITERAL_LONG2.setParseAction(refer_component(rdflib.Literal, mapfn=lambda x: x[3:-3]))
+STRING_LITERAL_LONG2.setParseAction(lambda x: rdflib.Literal(x[0][3:-3]))
 
 # [156] STRING_LITERAL1 ::= "'" ( ([^#x27#x5C#xA#xD]) | ECHAR )* "'"
 #STRING_LITERAL1 = Literal("'") + ZeroOrMore( Regex(u'[^\u0027\u005C\u000A\u000D]',flags=re.U) | ECHAR ) + "'"
 
 STRING_LITERAL1 = Regex(ur"'(?:[^\u0027\\\u000A\u000D]|\\['ntbrf])*'(?!')", flags=re.U)
-STRING_LITERAL1.setParseAction(refer_component(rdflib.Literal, mapfn=lambda x: x[1:-1]))
+STRING_LITERAL1.setParseAction(lambda x: rdflib.Literal(x[0][1:-1]))
 
 # [157] STRING_LITERAL2 ::= '"' ( ([^#x22#x5C#xA#xD]) | ECHAR )* '"'
 #STRING_LITERAL2 = Literal('"') + ZeroOrMore ( Regex(u'[^\u0022\u005C\u000A\u000D]',flags=re.U) | ECHAR ) + '"'
 
 STRING_LITERAL2 = Regex(ur'"(?:[^\u0022\\\u000A\u000D]|\\["ntbrf])*"(?!")', flags=re.U)
-STRING_LITERAL2.setParseAction(refer_component(rdflib.Literal, mapfn=lambda x: x[1:-1]))
+STRING_LITERAL2.setParseAction(lambda x: rdflib.Literal(x[0][1:-1]))
 
 # [161] NIL ::= '(' WS* ')'
 NIL = Literal('(') + ')'
@@ -307,17 +253,17 @@ A.setParseAction(lambda x: rdflib.RDF.type)
 # ------ NON-TERMINALS --------------
 
 # [5] BaseDecl ::= 'BASE' IRIREF
-BaseDecl = Keyword('BASE') + IRIREF
+BaseDecl = Comp('Base', Keyword('BASE') + Param('iri',IRIREF))
 
 # [6] PrefixDecl ::= 'PREFIX' PNAME_NS IRIREF
-PrefixDecl = Keyword('PREFIX') + PNAME_NS + IRIREF
+PrefixDecl = Comp('PrefixDecl', Keyword('PREFIX') + Param('prefix',PNAME_NS) + Param('iri',IRIREF))
 
 # [4] Prologue ::= ( BaseDecl | PrefixDecl )*
-Prologue = ZeroOrMore( BaseDecl | PrefixDecl )
+Prologue = Group ( ZeroOrMore( BaseDecl | PrefixDecl ) ) 
 
 # [108] Var ::= VAR1 | VAR2
 Var = VAR1 | VAR2
-Var.setParseAction(refer_component(rdflib.term.Variable))
+Var.setParseAction(lambda x: rdflib.term.Variable(x[0]))
 
 # [137] PrefixedName ::= PNAME_LN | PNAME_NS
 PrefixedName = PNAME_LN | PNAME_NS
@@ -348,7 +294,8 @@ NumericLiteralUnsigned = DOUBLE | DECIMAL | INTEGER
 NumericLiteral = NumericLiteralUnsigned | NumericLiteralPositive | NumericLiteralNegative
 
 # [134] BooleanLiteral ::= 'true' | 'false'
-BooleanLiteral = Keyword('true') | Keyword('false')
+BooleanLiteral = Keyword('true').setParseAction(lambda : rdflib.Literal(True)) |\
+    Keyword('false').setParseAction(lambda : rdflib.Literal(False))
 
 # [138] BlankNode ::= BLANK_NODE_LABEL | ANON
 BlankNode = BLANK_NODE_LABEL | ANON
@@ -363,7 +310,7 @@ VarOrTerm = Var | GraphTerm
 VarOrIri = Var | iri
 
 # [46] GraphRef ::= 'GRAPH' iri
-GraphRef = Keyword('GRAPH') + iri
+GraphRef = Comp('GraphRef', Keyword('GRAPH') + Param('iri', iri))
 
 # [47] GraphRefAll ::= GraphRef | 'DEFAULT' | 'NAMED' | 'ALL'
 GraphRefAll = GraphRef | Keyword('DEFAULT') | Keyword('NAMED') | Keyword('ALL')
@@ -528,13 +475,14 @@ GroupOrUnionGraphPattern = GroupGraphPattern + ZeroOrMore( Keyword('UNION') + Gr
 
 
 # [122] RegexExpression ::= 'REGEX' '(' Expression ',' Expression ( ',' Expression )? ')'
-RegexExpression = Keyword('REGEX') + '(' + Expression + ',' + Expression + Optional( ',' + Expression ) + ')'
+RegexExpression = Comp('RegexExpression',Keyword('REGEX') + '(' + Param('text',Expression) + ',' + Param('pattern',Expression) + Optional( ',' + Param('flags',Expression) ) + ')')
+
 
 # [123] SubstringExpression ::= 'SUBSTR' '(' Expression ',' Expression ( ',' Expression )? ')'
 SubstringExpression = Keyword('SUBSTR') + '(' + Expression + ',' + Expression + Optional( ',' + Expression ) + ')'
 
 # [124] StrReplaceExpression ::= 'REPLACE' '(' Expression ',' Expression ',' Expression ( ',' Expression )? ')'
-StrReplaceExpression = Keyword('REPLACE') + '(' + Expression + ',' + Expression + ',' + Expression + Optional( ',' + Expression ) + ')'
+StrReplaceExpression = Comp('StrReplaceExpression', Keyword('REPLACE') + '(' + Expression + ',' + Expression + ',' + Expression + Optional( ',' + Expression ) + ')' )
 
 # [125] ExistsFunc ::= 'EXISTS' GroupGraphPattern
 ExistsFunc = Keyword('EXISTS') + GroupGraphPattern
@@ -787,7 +735,7 @@ ConstructTemplate = '{' + Optional(ConstructTriples) + '}'
 
 
 # [120] BrackettedExpression ::= '(' Expression ')'
-BrackettedExpression = '(' + Expression + ')'
+BrackettedExpression = Suppress('(') + Group ( Expression ) + Suppress(')')
 
 # [119] PrimaryExpression ::= BrackettedExpression | BuiltInCall | iriOrFunction | RDFLiteral | NumericLiteral | BooleanLiteral | Var
 PrimaryExpression = BrackettedExpression | BuiltInCall | iriOrFunction | RDFLiteral | NumericLiteral | BooleanLiteral | Var
@@ -827,8 +775,8 @@ Expression << ConditionalOrExpression
 Constraint = BrackettedExpression | BuiltInCall | FunctionCall
 
 # [68] Filter ::= 'FILTER' Constraint
-Filter = Group( Keyword('FILTER') + Constraint )
-
+Filter = Group( Suppress(Keyword('FILTER')) + Constraint )
+Filter.setParseAction(lambda x: components.Filter(*x))
 
 
 
@@ -875,20 +823,24 @@ GroupGraphPatternSub = Optional(TriplesBlock) + ZeroOrMore( GraphPatternNotTripl
 HavingCondition = Constraint
 
 # [21] HavingClause ::= 'HAVING' HavingCondition+
-HavingClause = Group ( Keyword('HAVING') + OneOrMore(HavingCondition) )
+HavingClause = Suppress(Keyword('HAVING')) + Group ( OneOrMore(HavingCondition) )
+HavingClause.setParseAction(lambda x: components.Filter(*x))
 
 # [24] OrderCondition ::= ( ( 'ASC' | 'DESC' ) BrackettedExpression )
 # | ( Constraint | Var )
-OrderCondition = ( ( Keyword('ASC') | Keyword('DESC') ) + BrackettedExpression ) | ( Constraint | Var )
+OrderCondition = ( ( Keyword('ASC') | Keyword('DESC') | Empty().setParseAction(lambda : 'ASC') ) + Group(BrackettedExpression) ) | Empty().setParseAction(lambda : 'ASC') + Group ( Constraint | Var )
 
 # [23] OrderClause ::= 'ORDER' 'BY' OneOrMore(OrderCondition)
-OrderClause = Group ( Keyword('ORDER') + Keyword('BY') + OneOrMore(OrderCondition) ) 
+OrderClause =  Suppress(Keyword('ORDER') + Keyword('BY')) + Group ( OneOrMore(OrderCondition) )
+OrderCondition.setParseAction(lambda x: components.OrderBy(*x))
 
 # [26] LimitClause ::= 'LIMIT' INTEGER
-LimitClause = Keyword('LIMIT') + INTEGER
+LimitClause = Suppress(Keyword('LIMIT')) + INTEGER
+LimitClause.setParseAction(lambda x: components.Slice(limit=x[0]))
 
 # [27] OffsetClause ::= 'OFFSET' INTEGER
-OffsetClause = Keyword('OFFSET') + INTEGER
+OffsetClause = Suppress(Keyword('OFFSET')) + INTEGER
+OffsetClause.setParseAction(lambda x: components.Slice(offset=x[0]))
 
 # [25] LimitOffsetClauses ::= LimitClause Optional(OffsetClause) | OffsetClause Optional(LimitClause)
 LimitOffsetClauses = Group ( LimitClause + Optional(OffsetClause) | OffsetClause + Optional(LimitClause) ) 
@@ -898,10 +850,10 @@ SolutionModifier = Group ( Optional(GroupClause) + Optional(HavingClause) + Opti
 
 
 # [9] SelectClause ::= 'SELECT' ( 'DISTINCT' | 'REDUCED' )? ( ( Var | ( '(' Expression 'AS' Var ')' ) )+ | '*' )
-SelectClause = Keyword('SELECT') + Optional( Keyword('DISTINCT') | Keyword('REDUCED') ) + ( OneOrMore( Var | ( Literal('(') + Expression + Keyword('AS') + Var + ')' ) ) | '*' )
+SelectClause = Suppress(Keyword('SELECT')) + ( Keyword('DISTINCT') | Keyword('REDUCED') | Empty().setParseAction(lambda : 'NONE') ) + Group ( ( OneOrMore( Var | ( Literal('(') + Expression + Keyword('AS') + Var + ')' ) ) | '*' ) )
 
 # [17] WhereClause ::= 'WHERE'? GroupGraphPattern
-WhereClause = Group ( Optional(Keyword('WHERE')) + GroupGraphPattern ) 
+WhereClause = Group ( Suppress(Optional(Keyword('WHERE'))) + GroupGraphPattern ) 
 
 # [8] SubSelect ::= SelectClause WhereClause SolutionModifier ValuesClause
 SubSelect = Group ( SelectClause + WhereClause + SolutionModifier + ValuesClause )
@@ -911,6 +863,7 @@ GroupGraphPattern << Group( Suppress('{') + ( SubSelect | GroupGraphPatternSub )
 
 # [7] SelectQuery ::= SelectClause DatasetClause* WhereClause SolutionModifier
 SelectQuery = SelectClause + Group( ZeroOrMore(DatasetClause) ) + WhereClause + SolutionModifier
+SelectQuery.setParseAction(lambda x: components.SelectQuery(*x))
 
 # [10] ConstructQuery ::= 'CONSTRUCT' ( ConstructTemplate DatasetClause* WhereClause SolutionModifier | DatasetClause* 'WHERE' '{' TriplesTemplate? '}' SolutionModifier )
 ConstructQuery = Keyword('CONSTRUCT') + ( ConstructTemplate + ZeroOrMore(DatasetClause) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier )

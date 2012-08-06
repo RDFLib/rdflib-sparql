@@ -1,7 +1,7 @@
 
 import types
 
-from pyparsing import TokenConverter
+from pyparsing import TokenConverter, ParseResults
 
 # This is an alternative 
 
@@ -11,7 +11,7 @@ from pyparsing import TokenConverter
 class ParamValue(object): 
     def __init__(self, name, tokenList): 
         self.name=name
-        if len(tokenList)==1: tokenList=tokenList[0]
+        if isinstance(tokenList, (list,ParseResults)) and len(tokenList)==1: tokenList=tokenList[0]
         self.tokenList=tokenList
 
 class Param(TokenConverter): 
@@ -44,7 +44,8 @@ class CompValue(dict):
             try: 
                 return self[a]
             except: 
-                raise AttributeError('no such attribute '+a)
+                #raise AttributeError('no such attribute '+a)
+                return None
 
 class Comp(TokenConverter): 
     def __init__(self, name, expr): 
@@ -74,7 +75,7 @@ if __name__=='__main__':
     Number = Word(nums)
     Number.setParseAction(lambda x: int(x[0]))
     Plus = Comp('plus', Param('a',Number) + '+' + Param('b',Number) )
-    Plus.setEvalFn(lambda self,bindings: self['a']+self['b'])
+    Plus.setEvalFn(lambda self,bindings: self.a+self.b)
 
     r=Plus.parseString(sys.argv[1])
     print r
