@@ -1,3 +1,5 @@
+class SPARQLError: pass
+SPARQLError=SPARQLError()
 
 class comp(object):
     def __str__(self):
@@ -6,44 +8,8 @@ class comp(object):
     def __repr__(self):
         return str(self)
 
-class Filter(comp):
-    def __init__(self, constraint):
-        self.constraint=constraint
 
 
-# Expressions
-
-class Expression(comp):
-    def eval(ctx):
-        raise Exception('Sub-classes implement this!')
-
-
-
-# ----
-
-
-class PName(comp):
-    def __init__(self, prefix, localname):
-        self.prefix=prefix
-        self.localname=localname
-
-class PrefixDecl(comp):
-    def __init__(self, prefix, iri): 
-        self.prefix=prefix
-        self.iri=iri
-
-class OrderBy(comp): 
-    def __init__(self, order, comparators):
-        """ 
-        order = ASC|DESC
-        """
-        self.order=order
-        self.comparators=comparators
-
-class Slice(comp): 
-    def __init__(self, limit=-1, offset=0):
-        self.limit=limit
-        self.offset=offset
 
 class SelectQuery(comp):
     def __init__(self, preModifier, projection, datasetClause, groupGraphPattern, postModifier):         

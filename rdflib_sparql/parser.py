@@ -7,9 +7,10 @@ from pyparsing import Literal, Regex, Optional, OneOrMore, ZeroOrMore, \
 from pyparsing import CaselessKeyword as Keyword # watch out :) 
 #from pyparsing import Keyword as CaseSensitiveKeyword 
 
-from parserutils import Comp, Param
+from parserutils import Comp, Param, ParamList
 
 import rdflib_sparql.components as components
+import rdflib_sparql.operators as op
 
 import rdflib
 
@@ -148,8 +149,7 @@ PN_LOCAL = Combine((Regex(u'[%s0-9:]'%PN_CHARS_U_re, flags=re.U) | PLX ) + ZeroO
 
 
 # [141] PNAME_LN ::= PNAME_NS PN_LOCAL
-PNAME_LN = PNAME_NS + PN_LOCAL.leaveWhitespace()
-PNAME_LN.setParseAction(lambda x: [components.PName(*x)])
+PNAME_LN = Comp('pname', Param('prefix', PNAME_NS) + Param('localname', PN_LOCAL.leaveWhitespace()))
 
 # [142] BLANK_NODE_LABEL ::= '_:' ( PN_CHARS_U | [0-9] ) ((PN_CHARS|'.')* PN_CHARS)?
 BLANK_NODE_LABEL = Regex(ur'_:[0-9%s](?:[\.%s]*[%s])?'%(PN_CHARS_U_re, PN_CHARS_re, PN_CHARS_re), flags=re.U)
@@ -313,10 +313,10 @@ VarOrIri = Var | iri
 GraphRef = Comp('GraphRef', Keyword('GRAPH') + Param('iri', iri))
 
 # [47] GraphRefAll ::= GraphRef | 'DEFAULT' | 'NAMED' | 'ALL'
-GraphRefAll = GraphRef | Keyword('DEFAULT') | Keyword('NAMED') | Keyword('ALL')
+GraphRefAll = Comp('GraphRef', GraphRef | Param('special', Keyword('DEFAULT') | Keyword('NAMED') | Keyword('ALL')))
 
 # [45] GraphOrDefault ::= 'DEFAULT' | 'GRAPH'? iri
-GraphOrDefault = Keyword('DEFAULT') | Optional(Keyword('GRAPH')) + iri
+GraphOrDefault = Comp('GraphRef', Param('special', Keyword('DEFAULT')) | Optional(Keyword('GRAPH')) + Param('iri', iri))
 
 # [65] DataBlockValue ::= iri | RDFLiteral | NumericLiteral | BooleanLiteral | 'UNDEF'
 DataBlockValue = iri | RDFLiteral | NumericLiteral | BooleanLiteral | Keyword('UNDEF')
@@ -361,7 +361,7 @@ PathNegatedPropertySet = PathOneInPropertySet | '(' + Optional( PathOneInPropert
 PathPrimary = iri | A | '!' + PathNegatedPropertySet | '(' + Path + ')' | Keyword('DISTINCT') + '(' + Path + ')'
 
 # [91] PathElt ::= PathPrimary Optional(PathMod)
-PathElt = (PathPrimary + Optional(PathMod)).leaveWhitespace()
+PathElt = PathPrimary + Optional(PathMod).leaveWhitespace()
 
 # [92] PathEltOrInverse ::= PathElt | '^' PathElt
 PathEltOrInverse = PathElt | '^' + PathElt
@@ -386,10 +386,6 @@ ObjectPath = GraphNodePath
 ObjectListPath = ObjectPath + ZeroOrMore( ',' + ObjectPath )
 
 
-Expression = Forward()
-
-# [72] ExpressionList ::= NIL | '(' Expression ( ',' Expression )* ')'
-ExpressionList = NIL | '(' + Expression + ZeroOrMore( ',' + Expression ) + ')'
 
 GroupGraphPattern = Forward()
 
@@ -465,30 +461,33 @@ TriplesBlock << ( TriplesSameSubjectPath + Optional( Suppress('.') + Optional(Tr
 
 
 # [66] MinusGraphPattern ::= 'MINUS' GroupGraphPattern
-MinusGraphPattern = Keyword('MINUS') + GroupGraphPattern
+MinusGraphPattern = Comp('MINUS', Keyword('MINUS') + Param('graph', GroupGraphPattern))
 
 # [67] GroupOrUnionGraphPattern ::= GroupGraphPattern ( 'UNION' GroupGraphPattern )*
-GroupOrUnionGraphPattern = GroupGraphPattern + ZeroOrMore( Keyword('UNION') + GroupGraphPattern )
+GroupOrUnionGraphPattern = Comp('GroupOrUnionGraphPattern', ParamList('graph', GroupGraphPattern) + ZeroOrMore( Keyword('UNION') + ParamList('graph', GroupGraphPattern )))
 
 
 
+Expression = Forward()
 
+# [72] ExpressionList ::= NIL | '(' Expression ( ',' Expression )* ')'
+ExpressionList = NIL | Group(Suppress('(') + Expression + ZeroOrMore( ',' + Expression ) + Suppress(')') )
 
 # [122] RegexExpression ::= 'REGEX' '(' Expression ',' Expression ( ',' Expression )? ')'
-RegexExpression = Comp('RegexExpression',Keyword('REGEX') + '(' + Param('text',Expression) + ',' + Param('pattern',Expression) + Optional( ',' + Param('flags',Expression) ) + ')')
-
+RegexExpression = Comp('Builtin_REGEX',Keyword('REGEX') + '(' + Param('text',Expression) + ',' + Param('pattern',Expression) + Optional( ',' + Param('flags',Expression) ) + ')')
+RegexExpression.setEvalFn(op.Builtin_REGEX)
 
 # [123] SubstringExpression ::= 'SUBSTR' '(' Expression ',' Expression ( ',' Expression )? ')'
-SubstringExpression = Keyword('SUBSTR') + '(' + Expression + ',' + Expression + Optional( ',' + Expression ) + ')'
+SubstringExpression = Comp('Builtin_SUBSTR', Keyword('SUBSTR') + '(' + Param('source', Expression) + ',' + Param('startingLoc', Expression) + Optional( ',' + Param('length', Expression) ) + ')')
 
 # [124] StrReplaceExpression ::= 'REPLACE' '(' Expression ',' Expression ',' Expression ( ',' Expression )? ')'
-StrReplaceExpression = Comp('StrReplaceExpression', Keyword('REPLACE') + '(' + Expression + ',' + Expression + ',' + Expression + Optional( ',' + Expression ) + ')' )
+StrReplaceExpression = Comp('Builtin_REPLACE', Keyword('REPLACE') + '(' + Param('arg', Expression) + ',' + Param('pattern', Expression) + ',' + Param('replacement', Expression) + Optional( ',' + Param('flags',Expression) ) + ')' )
 
 # [125] ExistsFunc ::= 'EXISTS' GroupGraphPattern
-ExistsFunc = Keyword('EXISTS') + GroupGraphPattern
+ExistsFunc = Comp('Builtin_EXISTS', Keyword('EXISTS') + Param('graph', GroupGraphPattern))
 
 # [126] NotExistsFunc ::= 'NOT' 'EXISTS' GroupGraphPattern
-NotExistsFunc = Keyword('NOT') + Keyword('EXISTS') + GroupGraphPattern
+NotExistsFunc = Comp('Builtin_NOTEXISTS', Keyword('NOT') + Keyword('EXISTS') + Param('graph', GroupGraphPattern))
 
 
 # [127] Aggregate ::= 'COUNT' '(' 'DISTINCT'? ( '*' | Expression ) ')'
@@ -500,15 +499,15 @@ NotExistsFunc = Keyword('NOT') + Keyword('EXISTS') + GroupGraphPattern
 # | 'GROUP_CONCAT' '(' Optional('DISTINCT') Expression ( ';' 'SEPARATOR' '=' String )? ')'
 
 _Distinct = Optional(Keyword('DISTINCT'))
-_AggregateParams = '(' + _Distinct + Expression + ')'
+_AggregateParams = '(' + Param('distinct', _Distinct) + Param('vars', Expression) + ')'
 
-Aggregate = Keyword('COUNT') + '(' + _Distinct + ( '*' | Expression ) + ')' \
-    | Keyword('SUM') + _AggregateParams \
-    | Keyword('MIN') + _AggregateParams \
-    | Keyword('MAX') + _AggregateParams \
-    | Keyword('AVG') + _AggregateParams \
-    | Keyword('SAMPLE') + _AggregateParams \
-    | Keyword('GROUP_CONCAT') + '(' + _Distinct + Expression + Optional( ';' + Keyword('SEPARATOR') + '=' + String ) + ')'
+Aggregate = Comp('Aggregate_Count', Keyword('COUNT') + '(' + Param('distinct', _Distinct) + Param('vars', '*' | Expression ) + ')' )\
+    | Comp('Aggregate_Sum', Keyword('SUM') + _AggregateParams )\
+    | Comp('Aggregate_Min', Keyword('MIN') + _AggregateParams )\
+    | Comp('Aggregate_Max', Keyword('MAX') + _AggregateParams )\
+    | Comp('Aggregate_Avg', Keyword('AVG') + _AggregateParams )\
+    | Comp('Aggregate_Sample', Keyword('SAMPLE') + _AggregateParams )\
+    | Comp('Aggregate_GroupConcat', Keyword('GROUP_CONCAT') + '(' + Param('distinct',_Distinct) + Param('vars', Expression) + Optional( ';' + Keyword('SEPARATOR') + '=' + Param('separator', String) ) + ')' )
 
 # [121] BuiltInCall ::= Aggregate
 # | 'STR' '(' + Expression + ')'
@@ -567,61 +566,60 @@ Aggregate = Keyword('COUNT') + '(' + _Distinct + ( '*' | Expression ) + ')' \
 # | NotExistsFunc
 
 BuiltInCall = Aggregate \
-    | Keyword('STR') + '(' + Expression + ')' \
-    | Keyword('LANG') + '(' + Expression + ')' \
-    | Keyword('LANGMATCHES') + '(' + Expression + ',' + Expression + ')' \
-    | Keyword('DATATYPE') + '(' + Expression + ')' \
-    | Keyword('BOUND') + '(' + Var + ')' \
-    | Keyword('IRI') + '(' + Expression + ')' \
-    | Keyword('URI') + '(' + Expression + ')' \
-    | Keyword('BNODE') + ( '(' + Expression + ')' | NIL ) \
-    | Keyword('RAND') + NIL \
-    | Keyword('ABS') + '(' + Expression + ')' \
-    | Keyword('CEIL') + '(' + Expression + ')' \
-    | Keyword('FLOOR') + '(' + Expression + ')' \
-    | Keyword('ROUND') + '(' + Expression + ')' \
-    | Keyword('CONCAT') + ExpressionList \
+    | Comp('Builtin_STR', Keyword('STR') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_LANG', Keyword('LANG') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_LANGMATCHES', Keyword('LANGMATCHES') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_DATATYPE', Keyword('DATATYPE') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_BOUND', Keyword('BOUND') + '(' + Var + ')' ) \
+    | Comp('Builtin_IRI', Keyword('IRI') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_URI', Keyword('URI') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_BNODE', Keyword('BNODE') + ( '(' + Param('arg', Expression) + ')' | NIL ) ) \
+    | Comp('Builtin_RAND', Keyword('RAND') + NIL ) \
+    | Comp('Builtin_ABS', Keyword('ABS') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_CEIL', Keyword('CEIL') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_FLOOR', Keyword('FLOOR') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_ROUND', Keyword('ROUND') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_CONCAT', Keyword('CONCAT') + Param('arg', ExpressionList ) ) \
     | SubstringExpression \
-    | Keyword('STRLEN') + '(' + Expression + ')' \
+    | Comp('Builtin_STRLEN', Keyword('STRLEN') + '(' + Param('arg', Expression) + ')' ) \
     | StrReplaceExpression \
-    | Keyword('UCASE') + '(' + Expression + ')' \
-    | Keyword('LCASE') + '(' + Expression + ')' \
-    | Keyword('ENCODE_FOR_URI') + '(' + Expression + ')' \
-    | Keyword('CONTAINS') + '(' + Expression + ',' + Expression + ')' \
-    | Keyword('STRSTARTS') + '(' + Expression + ',' + Expression + ')' \
-    | Keyword('STRENDS') + '(' + Expression + ',' + Expression + ')' \
-    | Keyword('STRBEFORE') + '(' + Expression + ',' + Expression + ')' \
-    | Keyword('STRAFTER') + '(' + Expression + ',' + Expression + ')' \
-    | Keyword('YEAR') + '(' + Expression + ')' \
-    | Keyword('MONTH') + '(' + Expression + ')' \
-    | Keyword('DAY') + '(' + Expression + ')' \
-    | Keyword('HOURS') + '(' + Expression + ')' \
-    | Keyword('MINUTES') + '(' + Expression + ')' \
-    | Keyword('SECONDS') + '(' + Expression + ')' \
-    | Keyword('TIMEZONE') + '(' + Expression + ')' \
-    | Keyword('TZ') + '(' + Expression + ')' \
-    | Keyword('NOW') + NIL \
-    | Keyword('UUID') + NIL \
-    | Keyword('STRUUID') + NIL \
-    | Keyword('MD5') + '(' + Expression + ')' \
-    | Keyword('SHA1') + '(' + Expression + ')' \
-    | Keyword('SHA256') + '(' + Expression + ')' \
-    | Keyword('SHA384') + '(' + Expression + ')' \
-    | Keyword('SHA512') + '(' + Expression + ')' \
-    | Keyword('COALESCE') + ExpressionList \
-    | Keyword('IF') + '(' + Expression + ',' + Expression + ',' + Expression + ')' \
-    | Keyword('STRLANG') + '(' + Expression + ',' + Expression + ')' \
-    | Keyword('STRDT') + '(' + Expression + ',' + Expression + ')' \
-    | Keyword('sameTerm') + '(' + Expression + ',' + Expression + ')' \
-    | Keyword('isIRI') + '(' + Expression + ')' \
-    | Keyword('isURI') + '(' + Expression + ')' \
-    | Keyword('isBLANK') + '(' + Expression + ')' \
-    | Keyword('isLITERAL') + '(' + Expression + ')' \
-    | Keyword('isNUMERIC') + '(' + Expression + ')' \
+    | Comp('Builtin_UCASE', Keyword('UCASE') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_LCASE', Keyword('LCASE') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_ENCODE_FOR_URI', Keyword('ENCODE_FOR_URI') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_CONTAINS', Keyword('CONTAINS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_STRSTARTS', Keyword('STRSTARTS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_STRENDS', Keyword('STRENDS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_STRBEFORE', Keyword('STRBEFORE') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_STRAFTER', Keyword('STRAFTER') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_YEAR', Keyword('YEAR') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_MONTH', Keyword('MONTH') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_DAY', Keyword('DAY') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_HOURS', Keyword('HOURS') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_MINUTES', Keyword('MINUTES') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_SECONDS', Keyword('SECONDS') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_TIMEZONE', Keyword('TIMEZONE') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_TZ', Keyword('TZ') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_NOW', Keyword('NOW') + NIL ) \
+    | Comp('Builtin_UUID', Keyword('UUID') + NIL ) \
+    | Comp('Builtin_STRUUID', Keyword('STRUUID') + NIL ) \
+    | Comp('Builtin_MD5', Keyword('MD5') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_SHA1', Keyword('SHA1') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_SHA256', Keyword('SHA256') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_SHA384', Keyword('SHA384') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_SHA512', Keyword('SHA512') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_COALESCE', Keyword('COALESCE') + Param('arg', ExpressionList) ) \
+    | Comp('Builtin_IF', Keyword('IF') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ',' + Param('arg3', Expression) + ')' ) \
+    | Comp('Builtin_STRLANG', Keyword('STRLANG') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_STRDT', Keyword('STRDT') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_sameTerm', Keyword('sameTerm') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_isIRI', Keyword('isIRI') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_isURI', Keyword('isURI') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_isBLANK', Keyword('isBLANK') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_isLITERAL', Keyword('isLITERAL') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_isNUMERIC', Keyword('isNUMERIC') + '(' + Param('arg', Expression) + ')' ) \
     | RegexExpression \
     | ExistsFunc \
     | NotExistsFunc
-
 
 # [71] ArgList ::= NIL | '(' 'DISTINCT'? Expression ( ',' Expression )* ')'
 ArgList = NIL | '(' + _Distinct + Expression + ZeroOrMore( ',' + Expression ) + ')'
@@ -631,6 +629,62 @@ iriOrFunction = iri + Optional(ArgList)
 
 # [70] FunctionCall ::= iri ArgList
 FunctionCall = iri + ArgList
+
+
+# [120] BrackettedExpression ::= '(' Expression ')'
+BrackettedExpression = Suppress('(') + Group ( Expression ) + Suppress(')')
+
+# [119] PrimaryExpression ::= BrackettedExpression | BuiltInCall | iriOrFunction | RDFLiteral | NumericLiteral | BooleanLiteral | Var
+PrimaryExpression = BrackettedExpression | BuiltInCall | iriOrFunction | RDFLiteral | NumericLiteral | BooleanLiteral | Var
+
+# [118] UnaryExpression ::= '!' PrimaryExpression
+# | '+' PrimaryExpression
+# | '-' PrimaryExpression
+# | PrimaryExpression
+UnaryExpression = Comp('UnaryNot', '!' + Param('expr', PrimaryExpression)).setEvalFn(op.UnaryNot) \
+    | Comp('UnaryPlus', '+' + Param('expr', PrimaryExpression)) \
+    | Comp('UnaryMinus', '-' + Param('expr', PrimaryExpression)).setEvalFn(op.UnaryMinus) \
+    | PrimaryExpression
+
+# [117] MultiplicativeExpression ::= UnaryExpression ( '*' UnaryExpression | '/' UnaryExpression )*
+MultiplicativeExpression = Comp('MultiplicativeExpression', Param('expr', UnaryExpression) + ZeroOrMore( ParamList('op', '*') + ParamList('other', UnaryExpression) | ParamList('op', '/') + ParamList('other', UnaryExpression ))).setEvalFn(op.MultiplicativeExpression) 
+
+# [116] AdditiveExpression ::= MultiplicativeExpression ( '+' MultiplicativeExpression | '-' MultiplicativeExpression | ( NumericLiteralPositive | NumericLiteralNegative ) ( ( '*' UnaryExpression ) | ( '/' UnaryExpression ) )* )*
+
+### NOTE: The second part of this production is there because:
+### "In signed numbers, no white space is allowed between the sign and the number. The AdditiveExpression grammar rule allows for this by covering the two cases of an expression followed by a signed number. These produce an addition or subtraction of the unsigned number as appropriate."
+
+AdditiveExpression = Comp('AdditiveExpression', Param('expr', MultiplicativeExpression) +\
+           ZeroOrMore( ParamList('op','+') + ParamList('other', MultiplicativeExpression) | \
+                       ParamList('op','-') + ParamList('other', MultiplicativeExpression) ) ).setEvalFn(op.AdditiveExpression) 
+
+
+# [115] NumericExpression ::= AdditiveExpression
+NumericExpression = AdditiveExpression
+
+# [114] RelationalExpression ::= NumericExpression ( '=' NumericExpression | '!=' NumericExpression | '<' NumericExpression | '>' NumericExpression | '<=' NumericExpression | '>=' NumericExpression | 'IN' ExpressionList | 'NOT' 'IN' ExpressionList )?
+RelationalExpression = NumericExpression + Optional( '=' + NumericExpression | '!=' + NumericExpression | '<' + NumericExpression | '>' + NumericExpression | '<=' + NumericExpression | '>=' + NumericExpression | Keyword('IN') + ExpressionList | Keyword('NOT') + Keyword('IN') + ExpressionList )
+
+# [113] ValueLogical ::= RelationalExpression
+ValueLogical = RelationalExpression
+
+# [112] ConditionalAndExpression ::= ValueLogical ( '&&' ValueLogical )*
+ConditionalAndExpression = ValueLogical + ZeroOrMore( '&&' + ValueLogical )
+
+# [111] ConditionalOrExpression ::= ConditionalAndExpression ( '||' ConditionalAndExpression )*
+ConditionalOrExpression = ConditionalAndExpression + ZeroOrMore( '||' + ConditionalAndExpression )
+
+# [110] Expression ::= ConditionalOrExpression
+Expression << ConditionalOrExpression
+
+
+# [69] Constraint ::= BrackettedExpression | BuiltInCall | FunctionCall
+Constraint = BrackettedExpression | BuiltInCall | FunctionCall
+
+# [68] Filter ::= 'FILTER' Constraint
+Filter = Comp('Filter', Keyword('FILTER') + Param('expr', Constraint ))
+
+
 
 
 
@@ -734,49 +788,6 @@ ConstructTemplate = '{' + Optional(ConstructTriples) + '}'
 
 
 
-# [120] BrackettedExpression ::= '(' Expression ')'
-BrackettedExpression = Suppress('(') + Group ( Expression ) + Suppress(')')
-
-# [119] PrimaryExpression ::= BrackettedExpression | BuiltInCall | iriOrFunction | RDFLiteral | NumericLiteral | BooleanLiteral | Var
-PrimaryExpression = BrackettedExpression | BuiltInCall | iriOrFunction | RDFLiteral | NumericLiteral | BooleanLiteral | Var
-
-# [118] UnaryExpression ::= '!' PrimaryExpression
-# | '+' PrimaryExpression
-# | '-' PrimaryExpression
-# | PrimaryExpression
-UnaryExpression = '!' + PrimaryExpression | '+' + PrimaryExpression | '-' + PrimaryExpression | PrimaryExpression
-
-# [117] MultiplicativeExpression ::= UnaryExpression ( '*' UnaryExpression | '/' UnaryExpression )*
-MultiplicativeExpression = UnaryExpression + ZeroOrMore( '*' + UnaryExpression | '/' + UnaryExpression )
-
-# [116] AdditiveExpression ::= MultiplicativeExpression ( '+' MultiplicativeExpression | '-' MultiplicativeExpression | ( NumericLiteralPositive | NumericLiteralNegative ) ( ( '*' UnaryExpression ) | ( '/' UnaryExpression ) )* )*
-AdditiveExpression = MultiplicativeExpression + ZeroOrMore( '+' + MultiplicativeExpression | '-' + MultiplicativeExpression | ( NumericLiteralPositive | NumericLiteralNegative ) + ZeroOrMore( ( '*' + UnaryExpression ) | ( '/' + UnaryExpression ) ) )
-
-# [115] NumericExpression ::= AdditiveExpression
-NumericExpression = AdditiveExpression
-
-# [114] RelationalExpression ::= NumericExpression ( '=' NumericExpression | '!=' NumericExpression | '<' NumericExpression | '>' NumericExpression | '<=' NumericExpression | '>=' NumericExpression | 'IN' ExpressionList | 'NOT' 'IN' ExpressionList )?
-RelationalExpression = NumericExpression + Optional( '=' + NumericExpression | '!=' + NumericExpression | '<' + NumericExpression | '>' + NumericExpression | '<=' + NumericExpression | '>=' + NumericExpression | Keyword('IN') + ExpressionList | Keyword('NOT') + Keyword('IN') + ExpressionList )
-
-# [113] ValueLogical ::= RelationalExpression
-ValueLogical = RelationalExpression
-
-# [112] ConditionalAndExpression ::= ValueLogical ( '&&' ValueLogical )*
-ConditionalAndExpression = ValueLogical + ZeroOrMore( '&&' + ValueLogical )
-
-# [111] ConditionalOrExpression ::= ConditionalAndExpression ( '||' ConditionalAndExpression )*
-ConditionalOrExpression = ConditionalAndExpression + ZeroOrMore( '||' + ConditionalAndExpression )
-
-# [110] Expression ::= ConditionalOrExpression
-Expression << ConditionalOrExpression
-
-
-# [69] Constraint ::= BrackettedExpression | BuiltInCall | FunctionCall
-Constraint = BrackettedExpression | BuiltInCall | FunctionCall
-
-# [68] Filter ::= 'FILTER' Constraint
-Filter = Group( Suppress(Keyword('FILTER')) + Constraint )
-Filter.setParseAction(lambda x: components.Filter(*x))
 
 
 
@@ -828,22 +839,19 @@ HavingClause.setParseAction(lambda x: components.Filter(*x))
 
 # [24] OrderCondition ::= ( ( 'ASC' | 'DESC' ) BrackettedExpression )
 # | ( Constraint | Var )
-OrderCondition = ( ( Keyword('ASC') | Keyword('DESC') | Empty().setParseAction(lambda : 'ASC') ) + Group(BrackettedExpression) ) | Empty().setParseAction(lambda : 'ASC') + Group ( Constraint | Var )
+OrderCondition = ( ParamList('order', Keyword('ASC') | Keyword('DESC') | Empty().setParseAction(lambda : 'ASC') ) + ParamList('expr', BrackettedExpression) ) | ParamList('order', Empty().setParseAction(lambda : 'ASC')) + ParamList('expr', Constraint | Var )
 
 # [23] OrderClause ::= 'ORDER' 'BY' OneOrMore(OrderCondition)
-OrderClause =  Suppress(Keyword('ORDER') + Keyword('BY')) + Group ( OneOrMore(OrderCondition) )
-OrderCondition.setParseAction(lambda x: components.OrderBy(*x))
+OrderClause =  Comp('OrderClause', Keyword('ORDER') + Keyword('BY') + Group ( OneOrMore( OrderCondition) ))
 
 # [26] LimitClause ::= 'LIMIT' INTEGER
-LimitClause = Suppress(Keyword('LIMIT')) + INTEGER
-LimitClause.setParseAction(lambda x: components.Slice(limit=x[0]))
+LimitClause = Keyword('LIMIT') + Param('limit', INTEGER)
 
 # [27] OffsetClause ::= 'OFFSET' INTEGER
-OffsetClause = Suppress(Keyword('OFFSET')) + INTEGER
-OffsetClause.setParseAction(lambda x: components.Slice(offset=x[0]))
+OffsetClause = Keyword('OFFSET') + Param('offset', INTEGER)
 
 # [25] LimitOffsetClauses ::= LimitClause Optional(OffsetClause) | OffsetClause Optional(LimitClause)
-LimitOffsetClauses = Group ( LimitClause + Optional(OffsetClause) | OffsetClause + Optional(LimitClause) ) 
+LimitOffsetClauses = Comp ( 'LimitOffsetClauses', LimitClause + Optional(OffsetClause) | OffsetClause + Optional(LimitClause) ) 
 
 # [18] SolutionModifier ::= GroupClause? HavingClause? OrderClause? LimitOffsetClauses?
 SolutionModifier = Group ( Optional(GroupClause) + Optional(HavingClause) + Optional(OrderClause) + Optional(LimitOffsetClauses) ) 
