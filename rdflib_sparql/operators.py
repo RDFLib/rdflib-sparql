@@ -6,6 +6,8 @@ from rdflib import BNode, Variable, Literal, XSD
 
 from pyparsing import ParseResults
 
+from rdflib_sparql.sparql import SPARQLError, NotBoundError
+
 """ 
 This contains evaluation functions for expressions 
 
@@ -13,15 +15,6 @@ They get bound as instances-methods to the CompValue objects from parserutils
 
 """
 
-def value(ctx, val):
-    if isinstance(val, CompValue):
-        return val.eval(ctx)
-    elif isinstance(val, (BNode, Variable)):
-        return ctx[val]
-    elif isinstance(val, ParseResults) and len(val)==1:
-        return value(ctx,val[0])
-    else: 
-        return val
 
 def Builtin_REGEX(expr, ctx):
     """
@@ -31,16 +24,16 @@ def Builtin_REGEX(expr, ctx):
     Functions and Operators section 7.6.1 Regular Expression Syntax
     """
 
-    text = value(ctx, expr.text)
-    pattern = value(ctx, expr.pattern)
-    flags = value(ctx, expr.flags)
+    text = expr.text
+    pattern = expr.pattern
+    flags = expr.flags
 
     if flags:
         cFlag = 0
 
         # Maps XPath REGEX flags (http://www.w3.org/TR/xpath-functions/#flags)
         # to Python's re flags
-        flagMap=dict(('i', re.IGNORECASE), ('s', re.DOTALL), ('m', re.MULTILINE))
+        flagMap=dict([('i', re.IGNORECASE), ('s', re.DOTALL), ('m', re.MULTILINE)])
         cFlag=reduce(pyop.or_, [flagMap.get(f,0) for f in flags])
 
         return bool(re.compile(pattern,cFlag).search(text))
@@ -49,22 +42,21 @@ def Builtin_REGEX(expr, ctx):
         return bool(re.compile(pattern).search(text))
 
 def UnaryNot(expr,ctx):    
-    return EBV(value(ctx,expr.expr))
+    return EBV(expr.expr)
 
 def UnaryMinus(expr,ctx):
-    return -numeric(value(ctx, expr.expr))
+    return -numeric(expr.expr)
 
 def MultiplicativeExpression(expr,ctx):
 
     # because of the way the mul-expr production handled operator precedence
     # we sometimes have nothing to do
     if not expr.other: 
-        return value(ctx,expr.expr)
+        return expr.expr
 
-    res=numeric(value(ctx, expr.expr))
+    res=numeric(expr.expr)
     for op,e in zip(expr.op, expr.other): 
-        op=value(ctx,op)
-        e=numeric(value(ctx,e))
+        e=numeric(e)
         if op=='*':
             res*=e
         else: 
@@ -77,18 +69,48 @@ def AdditiveExpression(expr,ctx):
     # because of the way the add-expr production handled operator precedence
     # we sometimes have nothing to do
     if not expr.other: 
-        return value(ctx,expr.expr)
+        return expr.expr
 
-    res=numeric(value(ctx, expr.expr))
+    res=numeric(expr.expr)
     for op,e in zip(expr.op, expr.other): 
-        op=value(ctx,op)
-        e=numeric(value(ctx,e))
+        e=numeric(e)
         if op=='+':
             res+=e
         else: 
             res-=e
 
     return Literal(res)
+
+def RelationalExpression(e, ctx):
+
+    expr=e.expr
+    other=e.other
+
+    # because of the way the add-expr production handled operator precedence
+    # we sometimes have nothing to do
+    if not other: 
+        return expr
+
+    ops=dict( [ ('>', pyop.gt), 
+                ('<', pyop.lt),
+                ('=', pyop.eq),
+                ('!=', pyop.ne),
+                ('>=', pyop.ge),
+                ('<=', pyop.le),
+                ('IN', pyop.contains),
+                ('NOT IN', lambda x,y: not pyop.contains(x,y))] )
+    
+    if isinstance(expr, Variable): raise NotBoundError()
+
+    if not isinstance(expr, Literal): raise SPARQLError()
+    if not isinstance(other, Literal): raise SPARQLError()
+
+    return ops[e.op](expr, other)
+    
+    
+    
+    
+    
     
 
 def numeric(expr): 

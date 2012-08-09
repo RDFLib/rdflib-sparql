@@ -3,7 +3,9 @@ from types import MethodType
 from collections import OrderedDict
 
 from pyparsing import TokenConverter, ParseResults
-from rdflib_sparql.components import SPARQLError
+from rdflib_sparql.sparql import SPARQLError
+
+from rdflib import BNode, Variable
 
 DEBUG=True
 if DEBUG: 
@@ -12,6 +14,23 @@ if DEBUG:
 # This is an alternative 
 
 # Comp('Sum')( Param('x')(Number) + '+' + Param('y')(Number) )
+
+def value(ctx, val):
+    
+    if isinstance(val, CompValue):
+        return value(ctx,val.eval(ctx))
+    elif isinstance(val, list): 
+        return [value(ctx,x) for x in val]
+    elif isinstance(val, (BNode, Variable)):
+        try: 
+            return ctx[val]
+        except KeyError: 
+            return val
+    elif isinstance(val, ParseResults) and len(val)==1:
+        return value(ctx,val[0])
+    else: 
+        return val
+
 
 
 class ParamValue(object): 
@@ -44,15 +63,18 @@ class CompValue(OrderedDict):
         OrderedDict.__init__(self)
         self.name=name
 
-    def eval(self, bindings): 
+    def eval(self, ctx={}): 
         try: 
-            return self._evalfn(bindings)
+            self.ctx=ctx
+            return self._evalfn(ctx)
         except: 
             if DEBUG:
                 traceback.print_exc()
-            return SPARQLError
+            raise SPARQLError()
+        finally: 
+            self.ctx=None
 
-    def _evalfn(self, bindings): 
+    def _evalfn(self, ctx): 
         # identify function to be overridden!
         return self
 
@@ -62,17 +84,23 @@ class CompValue(OrderedDict):
     def __repr__(self):
         return self.name+OrderedDict.__repr__(self)
 
+    def _value(self,val): 
+        if self.ctx!=None: 
+            return value(self.ctx, val)
+        else: 
+            return val
+            
+    def __getitem__(self,a): 
+        return self._value(OrderedDict.__getitem__(self,a))
+
     def __getattr__(self,a):
+        # Hack hack: OrderedDict relies on this
+        if a=='_OrderedDict__root': raise AttributeError
         try: 
-            return OrderedDict.__getattr__(self,a)
-        except AttributeError:
-            # Hack hack: OrderedDict relies on this
-            if a=='_OrderedDict__root': raise
-            try: 
-                return self[a]
-            except: 
-                #raise AttributeError('no such attribute '+a)
-                return None
+            return self[a]
+        except: 
+            #raise AttributeError('no such attribute '+a)
+            return None
 
 class Comp(TokenConverter): 
     def __init__(self, name, expr): 
@@ -92,8 +120,8 @@ class Comp(TokenConverter):
                 else:
                     res[t.name]=t.tokenList
                 #res.append(t.tokenList)
-            if isinstance(t,CompValue):
-                res.update(t)
+            #if isinstance(t,CompValue):
+            #    res.update(t)
         return res
 
     def setEvalFn(self,evalfn):
@@ -108,7 +136,7 @@ if __name__=='__main__':
     Number = Word(nums)
     Number.setParseAction(lambda x: int(x[0]))
     Plus = Comp('plus', Param('a',Number) + '+' + Param('b',Number) )
-    Plus.setEvalFn(lambda self,bindings: self.a+self.b)
+    Plus.setEvalFn(lambda self,ctx: self.a+self.b)
 
     r=Plus.parseString(sys.argv[1])
     print r

@@ -3,13 +3,12 @@ import re
 
 
 from pyparsing import Literal, Regex, Optional, OneOrMore, ZeroOrMore, \
-    Forward, ParseException, Suppress, Combine, restOfLine, Group, Empty
+    Forward, ParseException, Suppress, Combine, restOfLine, Group, Empty, ParseResults
 from pyparsing import CaselessKeyword as Keyword # watch out :) 
 #from pyparsing import Keyword as CaseSensitiveKeyword 
 
 from parserutils import Comp, Param, ParamList
 
-import rdflib_sparql.components as components
 import rdflib_sparql.operators as op
 
 import rdflib
@@ -48,9 +47,11 @@ def expandTriples(terms):
                 res.append(res[i-2])
             elif t==';':
                 res.append(res[i-2])
-            elif isinstance(t,list): 
+            elif isinstance(t,list):
                 res.append(t[0])
                 res+=t
+            elif isinstance(t,ParseResults):
+                res+=t.asList()
             elif t!='.': 
                 res.append(t)
 
@@ -457,7 +458,7 @@ TriplesSameSubjectPath.setParseAction(expandTriples)
 
 # [55] TriplesBlock ::= TriplesSameSubjectPath ( '.' Optional(TriplesBlock) )?
 TriplesBlock = Forward()
-TriplesBlock << ( TriplesSameSubjectPath + Optional( Suppress('.') + Optional(TriplesBlock) ) )
+TriplesBlock << ( Param('triples',TriplesSameSubjectPath) + Optional( Suppress('.') + Optional(TriplesBlock) ) )
 
 
 # [66] MinusGraphPattern ::= 'MINUS' GroupGraphPattern
@@ -654,6 +655,9 @@ MultiplicativeExpression = Comp('MultiplicativeExpression', Param('expr', UnaryE
 ### NOTE: The second part of this production is there because:
 ### "In signed numbers, no white space is allowed between the sign and the number. The AdditiveExpression grammar rule allows for this by covering the two cases of an expression followed by a signed number. These produce an addition or subtraction of the unsigned number as appropriate."
 
+# Here (I think) this is not nescessary since pyparsing doesn't separate tokenizing and parsing
+
+
 AdditiveExpression = Comp('AdditiveExpression', Param('expr', MultiplicativeExpression) +\
            ZeroOrMore( ParamList('op','+') + ParamList('other', MultiplicativeExpression) | \
                        ParamList('op','-') + ParamList('other', MultiplicativeExpression) ) ).setEvalFn(op.AdditiveExpression) 
@@ -663,7 +667,16 @@ AdditiveExpression = Comp('AdditiveExpression', Param('expr', MultiplicativeExpr
 NumericExpression = AdditiveExpression
 
 # [114] RelationalExpression ::= NumericExpression ( '=' NumericExpression | '!=' NumericExpression | '<' NumericExpression | '>' NumericExpression | '<=' NumericExpression | '>=' NumericExpression | 'IN' ExpressionList | 'NOT' 'IN' ExpressionList )?
-RelationalExpression = NumericExpression + Optional( '=' + NumericExpression | '!=' + NumericExpression | '<' + NumericExpression | '>' + NumericExpression | '<=' + NumericExpression | '>=' + NumericExpression | Keyword('IN') + ExpressionList | Keyword('NOT') + Keyword('IN') + ExpressionList )
+RelationalExpression = Comp('RelationalExpression', Param('expr', NumericExpression) + Optional( \
+            Param('op', '=') + Param('other', NumericExpression) | \
+            Param('op', '!=') + Param('other', NumericExpression) | \
+            Param('op', '<') + Param('other', NumericExpression) | \
+            Param('op', '>') + Param('other', NumericExpression) | \
+            Param('op', '<=') + Param('other', NumericExpression) | \
+            Param('op', '>=') + Param('other', NumericExpression) | \
+            Param('op', Keyword('IN')) + Param('other', ExpressionList) | \
+            Param('op', Combine(Keyword('NOT') + Keyword('IN'), adjacent=False, joinString=" ")) + Param('other',ExpressionList) ) ).setEvalFn(op.RelationalExpression)
+
 
 # [113] ValueLogical ::= RelationalExpression
 ValueLogical = RelationalExpression
@@ -698,13 +711,13 @@ DefaultGraphClause = SourceSelector
 NamedGraphClause = Keyword('NAMED') + SourceSelector
 
 # [13] DatasetClause ::= 'FROM' ( DefaultGraphClause | NamedGraphClause )
-DatasetClause = Keyword('FROM') + ( DefaultGraphClause | NamedGraphClause )
+DatasetClause = Comp('DatasetClause', Keyword('FROM') + ( Param('default', DefaultGraphClause) | Param('named', NamedGraphClause) ))
 
 # [20] GroupCondition ::= BuiltInCall | FunctionCall | '(' Expression ( 'AS' Var )? ')' | Var
 GroupCondition = BuiltInCall | FunctionCall | '(' + Expression + Optional( Keyword('AS') + Var ) + ')' | Var
 
 # [19] GroupClause ::= 'GROUP' 'BY' GroupCondition+
-GroupClause = Keyword('GROUP') + Keyword('BY') + OneOrMore(GroupCondition)
+GroupClause = Comp('GroupClause', Keyword('GROUP') + Keyword('BY') + OneOrMore(ParamList('condition', GroupCondition)))
 
 
 
@@ -788,10 +801,6 @@ ConstructTemplate = '{' + Optional(ConstructTriples) + '}'
 
 
 
-
-
-
-
 # [57] OptionalGraphPattern ::= 'OPTIONAL' GroupGraphPattern
 OptionalGraphPattern = Keyword('OPTIONAL') + GroupGraphPattern
 
@@ -811,19 +820,7 @@ InlineData = Keyword('VALUES') + DataBlock
 GraphPatternNotTriples = GroupOrUnionGraphPattern | OptionalGraphPattern | MinusGraphPattern | GraphGraphPattern | ServiceGraphPattern | Filter | Bind | InlineData
 
 # [54] GroupGraphPatternSub ::= Optional(TriplesBlock) ( GraphPatternNotTriples '.'? Optional(TriplesBlock) )*
-GroupGraphPatternSub = Optional(TriplesBlock) + ZeroOrMore( GraphPatternNotTriples + Optional('.') + Optional(TriplesBlock) )
-
-
-
-
-
-
-
-
-
-
-
-
+GroupGraphPatternSub = Comp('GroupGraphPatternSub', Optional(ParamList('part', Comp('TriplesBlock', TriplesBlock))) + ZeroOrMore( ParamList('part', GraphPatternNotTriples) + Optional('.') + Optional(ParamList('part', Comp('TriplesBlock',TriplesBlock))) ) )
 
 
 
@@ -834,8 +831,7 @@ GroupGraphPatternSub = Optional(TriplesBlock) + ZeroOrMore( GraphPatternNotTripl
 HavingCondition = Constraint
 
 # [21] HavingClause ::= 'HAVING' HavingCondition+
-HavingClause = Suppress(Keyword('HAVING')) + Group ( OneOrMore(HavingCondition) )
-HavingClause.setParseAction(lambda x: components.Filter(*x))
+HavingClause = Comp('HavingClause', Keyword('HAVING') + OneOrMore(ParamList('condition', HavingCondition)))
 
 # [24] OrderCondition ::= ( ( 'ASC' | 'DESC' ) BrackettedExpression )
 # | ( Constraint | Var )
@@ -854,14 +850,14 @@ OffsetClause = Keyword('OFFSET') + Param('offset', INTEGER)
 LimitOffsetClauses = Comp ( 'LimitOffsetClauses', LimitClause + Optional(OffsetClause) | OffsetClause + Optional(LimitClause) ) 
 
 # [18] SolutionModifier ::= GroupClause? HavingClause? OrderClause? LimitOffsetClauses?
-SolutionModifier = Group ( Optional(GroupClause) + Optional(HavingClause) + Optional(OrderClause) + Optional(LimitOffsetClauses) ) 
+SolutionModifier = Optional(GroupClause) + Optional(HavingClause) + Optional(OrderClause) + Optional(LimitOffsetClauses) 
 
 
 # [9] SelectClause ::= 'SELECT' ( 'DISTINCT' | 'REDUCED' )? ( ( Var | ( '(' Expression 'AS' Var ')' ) )+ | '*' )
-SelectClause = Suppress(Keyword('SELECT')) + ( Keyword('DISTINCT') | Keyword('REDUCED') | Empty().setParseAction(lambda : 'NONE') ) + Group ( ( OneOrMore( Var | ( Literal('(') + Expression + Keyword('AS') + Var + ')' ) ) | '*' ) )
+SelectClause = Keyword('SELECT') + Optional(Param('modifier', Keyword('DISTINCT') | Keyword('REDUCED') )) + ( OneOrMore( ParamList('var', Var) | ( Literal('(') + ParamList('expr', Expression) + Keyword('AS') + ParamList('evar', Var) + ')' ) ) | '*' )
 
 # [17] WhereClause ::= 'WHERE'? GroupGraphPattern
-WhereClause = Group ( Suppress(Optional(Keyword('WHERE'))) + GroupGraphPattern ) 
+WhereClause = Optional(Keyword('WHERE')) + Param('where', GroupGraphPattern )
 
 # [8] SubSelect ::= SelectClause WhereClause SolutionModifier ValuesClause
 SubSelect = Group ( SelectClause + WhereClause + SolutionModifier + ValuesClause )
@@ -870,8 +866,8 @@ SubSelect = Group ( SelectClause + WhereClause + SolutionModifier + ValuesClause
 GroupGraphPattern << Group( Suppress('{') + ( SubSelect | GroupGraphPatternSub ) + Suppress('}') ) 
 
 # [7] SelectQuery ::= SelectClause DatasetClause* WhereClause SolutionModifier
-SelectQuery = SelectClause + Group( ZeroOrMore(DatasetClause) ) + WhereClause + SolutionModifier
-SelectQuery.setParseAction(lambda x: components.SelectQuery(*x))
+SelectQuery = Comp('SelectQuery', SelectClause + Param('from', ZeroOrMore(DatasetClause) ) + WhereClause + Param('solutionmodifier', SolutionModifier))
+#SelectQuery.setParseAction(lambda x: components.SelectQuery(*x))
 
 # [10] ConstructQuery ::= 'CONSTRUCT' ( ConstructTemplate DatasetClause* WhereClause SolutionModifier | DatasetClause* 'WHERE' '{' TriplesTemplate? '}' SolutionModifier )
 ConstructQuery = Keyword('CONSTRUCT') + ( ConstructTemplate + ZeroOrMore(DatasetClause) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier )
@@ -924,6 +920,7 @@ def parseQuery(q):
     if hasattr(q,'read'): q=q.read()
     q=expandUnicodeEscapes(q)
     return Query.parseString(q)
+
 
 if __name__=='__main__':
     import sys

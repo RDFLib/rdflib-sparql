@@ -1,29 +1,35 @@
 
+from rdflib import BNode, Variable
+from rdflib.query import Processor, Result
+
+from rdflib_sparql.parser import parseQuery
+from rdflib_sparql.evaluate import evalQuery
+
+"""
+Code for tying SPARQL Engine into RDFLib
+"""
+
+class SPARQLResult(Result):
+    
+    def __init__(self, type_, vars_=None, bindings=None, 
+                 askAnswer=None, graph=None): 
+        Result.__init__(self,type_)
+        self.vars=vars_
+        self.bindings=bindings
+        self.askAnswer=askAnswer
+        self.graph=graph
 
 
-class Bindings(dict):
-    def __init__(self, outer=None): 
-        self.outer=outer
-    def __getitem__(self, key):
-        try:
-            return dict.__getitem__(self, key)
-        except: 
-            if not self.outer: raise
-            return self.outer[key]
+class SPARQLProcessor(Processor): 
+
+    def __init__(self, graph):
+        self.graph=graph
+
+    def query(self, strOrQuery, initBindings={}, initNs={}, DEBUG=False):
         
+        query=parseQuery(strOrQuery)
 
-class QueryContext(object): 
-
-    def __init__(self): 
-        self.bindings=Bindings()
-
-    def __getitem__(self, key):
-        return self.bindings[key]
-
-    def push(self):
-        self.bindings=Bindings(self.bindings)
+        # clean-up / optimize!
         
-    def pop(self):
-        self.bindings=self.bindings.outer
-        if self.bindings==None:
-            raise "We've bottomed out of the bindings stack!"
+        return SPARQLResult(**evalQuery(self.graph, query, initBindings, initNs))
+        

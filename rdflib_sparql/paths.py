@@ -1,31 +1,4 @@
-class SPARQLError: pass
-SPARQLError=SPARQLError()
 
-class comp(object):
-    def __str__(self):
-        return '%s(%s)'%(type(self).__name__,", ".join("%s=%s"%(v,getattr(self,v)) for v in dir(self) if not v.startswith("_")))
-
-    def __repr__(self):
-        return str(self)
-
-
-
-
-class SelectQuery(comp):
-    def __init__(self, preModifier, projection, datasetClause, groupGraphPattern, postModifier):         
-        """
-        preModifier = reduced,disctint,none
-        projection = * or vars
-        datasetClause = from named ...
-        groupGraph = { triples etc. }
-        postModifier = group, having, order, limitoffset
-        """
-        self.preModifier=preModifier
-        self.projection=projection
-        self.datasetClause=datasetClause
-        self.groupGraphPattern=groupGraphPattern
-        self.postModifier=postModifier
-        
 
 from rdflib import URIRef
 
