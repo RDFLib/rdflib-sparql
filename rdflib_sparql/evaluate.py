@@ -1,17 +1,11 @@
-from rdflib import Variable, URIRef
+from rdflib import Variable, URIRef, Literal
 
 from rdflib_sparql.parserutils import CompValue
-from rdflib_sparql.sparql import QueryContext
+from rdflib_sparql.operators import simplify, EBV
+from rdflib_sparql.sparql import QueryContext, NotBoundError, AlreadyBound, SPARQLError
 
+from algebra import findFiltersQuery
 
-def absolutize(ctx, iri):
-    if isinstance(iri, CompValue) and iri.name=='pname':
-        return ctx.resolvePName(iri.prefix, iri.localname)
-    if not isinstance(iri, URIRef): 
-        return iri
-    if not ':' in iri: 
-        return ctx.base+iri
-    return iri
 
 def triples(l): 
     assert (len(l) % 3) == 0, 'these aint triples'
@@ -22,26 +16,40 @@ def matchBGP(bgp, ctx):
     if not bgp:
         yield ctx
         return 
+
     
-    s,p,o=[absolutize(ctx,x) for x in bgp[0]]
+    s,p,o=[ctx.absolutize(x) for x in bgp[0]]
+
+    #import nose.tools ;nose.tools.set_trace()
+    #import pdb ; pdb.set_trace()
 
     _s=ctx[s]
     _p=ctx[p]
     _o=ctx[o]
 
     for ss,sp,so in ctx.graph.triples((_s,_p,_o)):
-        if not all((_s,_p,_o)): 
-            ctx.push()
+        try: 
+            if not all((_s,_p,_o)): 
+                ctx.push()
 
-        if not _s: ctx[s]=ss
-        if not _p: ctx[p]=sp
-        if not _o: ctx[o]=so
-        
-        for _ctx in matchBGP(bgp[1:],ctx): 
-            yield _ctx
-        
-        if not all((_s,_p,_o)): 
-            ctx.pop()
+            if _s==None: ctx[s]=ss
+
+            try: 
+                if _p==None: ctx[p]=sp
+            except AlreadyBound: 
+                continue
+
+            try: 
+                if _o==None: ctx[o]=so
+            except AlreadyBound: 
+                continue
+
+            for _ctx in matchBGP(bgp[1:],ctx): 
+                yield _ctx
+
+        finally:
+            if not all((_s,_p,_o)): 
+                ctx.pop()
 
 
 
@@ -74,17 +82,25 @@ def evalQuery(graph, query, initBindings, initNs):
         if x.name=='Base': 
             ctx.base=x.iri
         elif x.name=='PrefixDecl':
-            ctx.namespace_manager.bind(x.prefix, absolutize(ctx,x.iri))
+            ctx.namespace_manager.bind(x.prefix, ctx.absolutize(x.iri))
             
     
     # valuesClause = query[2]
 
-    selQuery=query[1]
+    main=query[1]
 
-    if isinstance(selQuery, CompValue):
+    if isinstance(main, CompValue):
 
-        if selQuery.name=='SelectQuery': 
-            return evalSelectQuery(ctx,selQuery)
+        if main.name=='SelectQuery': 
+            return evalSelectQuery(ctx,main)
+        elif main.name=='AskQuery':
+            return evalAskQuery(ctx,main)
+        elif main.name=='ConstructQuery':
+            raise Exception('CONSTRUCT not implemented')
+        elif main.name=='DescribeQuery':
+            raise Exception('DESCRIBE not implemented')
+        else: 
+            raise Exception('I do not know this type of query: %s'%main.name)
 
     raise Exception('Urk!')
 
@@ -92,7 +108,17 @@ def evalPart(ctx, part):
     if part.name=='TriplesBlock':
         for c in matchBGP(triples(part.triples), ctx):
             yield c
+    elif part.name=='Filter': 
+        yield ctx # handled outside
+    elif part.name=='OptionalGraphPattern':
+        solutions=False
+        for c in evalParts(ctx,part.graph.part):
+            solutions=True
+            yield c
+
+        if not solutions: yield ctx # optional!            
     else: 
+        #import pdb ; pdb.set_trace()
         raise Exception('I dont know: %s'%part.name)
 
 def evalParts(ctx, parts):
@@ -104,18 +130,52 @@ def evalParts(ctx, parts):
         for s in evalParts(c, parts[1:]):
             yield s
     
-            
 
-def evalSelectQuery(ctx,query):
+def evalAskQuery(ctx, query):            
+
+    #import pdb; pdb.set_trace()
+
+    if query.limitoffset:
+        raise Exception("As far as I know limit and offset make no sense for ASK queries.")
+
+    filters=findFiltersQuery(query)
+    filters=simplify(filters) # TODO move me!
+
+    answer=False
+
+    for c in evalParts(ctx, query.where.part):
+        try: 
+            if filters and not EBV(filters.eval(c)):
+                print "Filter fail",c
+                continue
+        except NotBoundError:
+            print "Filter NotBound fail",c
+            continue
+        answer=True
+        break
+        
+    res={}
+    res["type_"]="ASK"    
+    res["askAnswer"]=answer
+
+    return res
+
+
+
+def evalSelectQuery(ctx, query):
+
+    #import pdb; pdb.set_trace()
 
     selectVars=None
     limit=None
     offset=0
 
     bindings=[]
-    if query.solutionmodifier:
-        limit=query.solutionmodifier.limit
-        offset=query.solutionmodifier.offset
+    if query.limitoffset:
+        if query.limitoffset.limit: 
+            limit=query.limitoffset.limit.toPython()
+        if query.limitoffset.offset:             
+            offset=query.limitoffset.offset.toPython()
 
     if query.var: 
         selectVars=query.var
@@ -123,8 +183,24 @@ def evalSelectQuery(ctx,query):
     distinct=query.modifier and query.modifier=='DISTINCT'
     distinctSet=set()
 
+    filters=findFiltersQuery(query)
+    print filters
+    filters=simplify(filters) # TODO move me!
+    print filters
+
     i=0
-    for c in evalParts(ctx, query.where[0].part):
+    for c in evalParts(ctx, query.where.part):
+        try: 
+            if filters and not EBV(filters.eval(c)):
+                print "Filter fail",c
+                continue
+        except SPARQLError:
+            print "Filter ERRROR fail",c
+            continue
+        except NotBoundError:
+            print "Filter NotBound fail",c
+            continue
+
         if i>=offset:
             solution=c.solution(selectVars)
             if distinct:                

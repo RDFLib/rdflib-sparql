@@ -1,0 +1,3 @@
+- Literal cmp/hash-values
+
+- Find all vars when 'select *' and no results

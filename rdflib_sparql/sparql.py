@@ -1,14 +1,20 @@
 from rdflib.namespace import NamespaceManager
-from rdflib import Variable, BNode, Graph, URIRef
+from rdflib import Variable, BNode, Graph, URIRef, Literal
+
+from parserutils import CompValue
 
 class SPARQLError(Exception): 
-    def __init__(self): 
-        Exception.__init__(self)
+    def __init__(self,msg=None): 
+        Exception.__init__(self,msg)
 
 class NotBoundError(SPARQLError):
     def __init__(self): 
         SPARQLError.__init__(self)
 
+class AlreadyBound(SPARQLError): 
+    """Raised when trying to bind a variable that is already bound!"""
+    def __init__(self): 
+        SPARQLError.__init__(self)
 
 class Bindings(dict):
     def __init__(self, outer=None): 
@@ -56,6 +62,9 @@ class QueryContext(object):
             return dict(self.bindings.iteritems())
 
     def __setitem__(self, key, value): 
+        if key in self.bindings and self.bindings[key]!=value:
+            raise AlreadyBound()
+            
         self.bindings[key]=value
 
     def push(self):
@@ -67,4 +76,23 @@ class QueryContext(object):
             raise Exception("We've bottomed out of the bindings stack!")
 
     def resolvePName(self, prefix, localname): 
-        return URIRef(self.namespace_manager.store.namespace(prefix)+localname)
+        return URIRef(self.namespace_manager.store.namespace(prefix or "")+(localname or ""))
+    
+    def absolutize(self, iri):
+    
+        """
+        Apply BASE / PREFIXes to URIs 
+        (and to datatypes in Literals)
+        """
+    
+        if isinstance(iri, CompValue): 
+            if iri.name=='pname':
+                return self.resolvePName(iri.prefix, iri.localname)
+            if iri.name=='literal':
+                return Literal(iri.string, lang=iri.lang, datatype=self.absolutize(iri.datatype))
+        if not isinstance(iri, URIRef): 
+            return iri
+        if not ':' in iri: # TODO: Better check for relative URI?
+            return URIRef(self.base+iri)
+        return iri
+

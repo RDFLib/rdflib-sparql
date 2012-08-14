@@ -3,11 +3,11 @@ from types import MethodType
 from collections import OrderedDict
 
 from pyparsing import TokenConverter, ParseResults
-from rdflib_sparql.sparql import SPARQLError
 
-from rdflib import BNode, Variable
+from rdflib import BNode, Variable, Literal, URIRef
 
 DEBUG=True
+DEBUG=False
 if DEBUG: 
     import traceback
 
@@ -15,19 +15,37 @@ if DEBUG:
 
 # Comp('Sum')( Param('x')(Number) + '+' + Param('y')(Number) )
 
-def value(ctx, val):
-    
-    if isinstance(val, CompValue):
-        return value(ctx,val.eval(ctx))
+def value(ctx, val, variables=False):
+
+    if isinstance(val, Expr): 
+        return val.eval(ctx) # recurse?
+    elif isinstance(val, CompValue):
+        if val.name=='literal': 
+            return ctx.absolutize(val)
+        elif val.name=='pname':
+            return ctx.absolutize(val)
+        else: 
+            raise Exception("What do I do wit this CompValue? %s"%val)
+
     elif isinstance(val, list): 
         return [value(ctx,x) for x in val]
+
     elif isinstance(val, (BNode, Variable)):
-        try: 
-            return ctx[val]
-        except KeyError: 
+        r=ctx[val] 
+        if r!=None: return r
+
+        # not bound
+        if variables:
             return val
+        else: 
+            raise NotBoundError
+
     elif isinstance(val, ParseResults) and len(val)==1:
         return value(ctx,val[0])
+
+    elif isinstance(val, URIRef): 
+        return ctx.absolutize(val) 
+
     else: 
         return val
 
@@ -56,51 +74,70 @@ class ParamList(Param):
     def __init__(self,name,expr):
         Param.__init__(self,name,expr,True)
 
+class plist(list):
+    """this is just a list, but we want our own type to check for"""
+
+    pass
 
 class CompValue(OrderedDict):
-    def __init__(self,name):
-        
+
+    def __init__(self, name, dict_=None):        
         OrderedDict.__init__(self)
         self.name=name
-
-    def eval(self, ctx={}): 
-        try: 
-            self.ctx=ctx
-            return self._evalfn(ctx)
-        except: 
-            if DEBUG:
-                traceback.print_exc()
-            raise SPARQLError()
-        finally: 
-            self.ctx=None
-
-    def _evalfn(self, ctx): 
-        # identify function to be overridden!
-        return self
-
+        if dict_:
+            self.update(dict_)
+            
     def __str__(self):
         return self.name+OrderedDict.__str__(self)
 
     def __repr__(self):
         return self.name+OrderedDict.__repr__(self)
 
-    def _value(self,val): 
+    def _value(self,val,variables=False): 
         if self.ctx!=None: 
-            return value(self.ctx, val)
+            return value(self.ctx, val, variables)
         else: 
             return val
             
     def __getitem__(self,a): 
         return self._value(OrderedDict.__getitem__(self,a))
 
+    def get(self,a,variables=False):
+        return self._value(OrderedDict.__getitem__(self,a),variables)
+
     def __getattr__(self,a):
         # Hack hack: OrderedDict relies on this
         if a=='_OrderedDict__root': raise AttributeError
         try: 
             return self[a]
-        except: 
+        except KeyError: 
             #raise AttributeError('no such attribute '+a)
             return None
+
+class Expr(CompValue): 
+    """A comp value that can be evaluated"""
+
+    def __init__(self, name, dict_=None, evalfn=None):        
+        super(Expr,self).__init__(name,dict_)
+
+        self._evalfn=None
+        if evalfn:
+            self._evalfn=MethodType(evalfn, self, CompValue)
+
+    def eval(self, ctx={}): 
+        try: 
+            self.ctx=ctx
+            return self._evalfn(ctx)
+        except NotBoundError:
+            raise
+        except Exception,e: 
+            if DEBUG:
+                traceback.print_exc()
+            raise SPARQLError(e)
+        finally: 
+            self.ctx=None
+
+
 
 class Comp(TokenConverter): 
     def __init__(self, name, expr): 
@@ -109,13 +146,17 @@ class Comp(TokenConverter):
         self.evalfn=None
 
     def postParse(self, instring, loc, tokenList):
-        res=CompValue(self.name)
+
         if self.evalfn:
+            res=Expr(self.name)
             res._evalfn=MethodType(self.evalfn, res, CompValue)
+        else:
+            res=CompValue(self.name)
+
         for t in tokenList: 
             if isinstance(t,ParamValue):
                 if t.isList:
-                    if not t.name in res: res[t.name]=[]
+                    if not t.name in res: res[t.name]=plist()
                     res[t.name].append(t.tokenList)
                 else:
                     res[t.name]=t.tokenList
@@ -141,3 +182,5 @@ if __name__=='__main__':
     r=Plus.parseString(sys.argv[1])
     print r
     print r[0].eval({})
+
+from rdflib_sparql.sparql import SPARQLError, NotBoundError

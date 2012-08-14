@@ -1,6 +1,6 @@
 
 import re
-
+import traceback
 
 from pyparsing import Literal, Regex, Optional, OneOrMore, ZeroOrMore, \
     Forward, ParseException, Suppress, Combine, restOfLine, Group, Empty, ParseResults
@@ -25,12 +25,15 @@ def neg(literal):
         
 
 def setLanguage(terms):
-    terms[0].language=terms[1]
-    return terms[0]
+    return rdflib.Literal(terms[0], lang=terms[1])
 
 def setDataType(terms):
-    terms[0].datatype=terms[1]
-    return terms[0]
+    try: 
+        return rdflib.Literal(terms[0], datatype=terms[1])
+    except: 
+        if DEBUG: 
+            traceback.print_exc()
+        raise
 
 def expandTriples(terms):
     
@@ -46,7 +49,7 @@ def expandTriples(terms):
                 res.append(res[i-3])
                 res.append(res[i-2])
             elif t==';':
-                res.append(res[i-2])
+                res.append(res[i-3])
             elif isinstance(t,list):
                 res.append(t[0])
                 res+=t
@@ -128,7 +131,7 @@ PN_CHARS_re = u'\\-0-9\u00B7\u0300-\u036F\u203F-\u2040'+PN_CHARS_U_re
 PN_PREFIX = Regex(ur'[%s](?:[%s\.]*[%s])?'%(PN_CHARS_BASE_re, PN_CHARS_re, PN_CHARS_re), flags=re.U)
 
 # [140] PNAME_NS ::= PN_PREFIX? ':'
-PNAME_NS = Combine(Optional(PN_PREFIX) + Suppress(':'))
+PNAME_NS = Optional(Param('prefix', PN_PREFIX)) + Suppress(':').leaveWhitespace()
 
 # [173] PN_LOCAL_ESC ::= '\' ( '_' | '~' | '.' | '-' | '!' | '$' | '&' | "'" | '(' | ')' | '*' | '+' | ',' | ';' | '=' | '/' | '?' | '#' | '@' | '%' )
 
@@ -150,7 +153,7 @@ PN_LOCAL = Combine((Regex(u'[%s0-9:]'%PN_CHARS_U_re, flags=re.U) | PLX ) + ZeroO
 
 
 # [141] PNAME_LN ::= PNAME_NS PN_LOCAL
-PNAME_LN = Comp('pname', Param('prefix', PNAME_NS) + Param('localname', PN_LOCAL.leaveWhitespace()))
+PNAME_LN = PNAME_NS + Param('localname', PN_LOCAL.leaveWhitespace())
 
 # [142] BLANK_NODE_LABEL ::= '_:' ( PN_CHARS_U | [0-9] ) ((PN_CHARS|'.')* PN_CHARS)?
 BLANK_NODE_LABEL = Regex(ur'_:[0-9%s](?:[\.%s]*[%s])?'%(PN_CHARS_U_re, PN_CHARS_re, PN_CHARS_re), flags=re.U)
@@ -257,7 +260,7 @@ A.setParseAction(lambda x: rdflib.RDF.type)
 BaseDecl = Comp('Base', Keyword('BASE') + Param('iri',IRIREF))
 
 # [6] PrefixDecl ::= 'PREFIX' PNAME_NS IRIREF
-PrefixDecl = Comp('PrefixDecl', Keyword('PREFIX') + Param('prefix',PNAME_NS) + Param('iri',IRIREF))
+PrefixDecl = Comp('PrefixDecl', Keyword('PREFIX') + PNAME_NS + Param('iri',IRIREF))
 
 # [4] Prologue ::= ( BaseDecl | PrefixDecl )*
 Prologue = Group ( ZeroOrMore( BaseDecl | PrefixDecl ) ) 
@@ -267,7 +270,7 @@ Var = VAR1 | VAR2
 Var.setParseAction(lambda x: rdflib.term.Variable(x[0]))
 
 # [137] PrefixedName ::= PNAME_LN | PNAME_NS
-PrefixedName = PNAME_LN | PNAME_NS
+PrefixedName = Comp('pname', PNAME_LN | PNAME_NS)
 
 # [136] iri ::= IRIREF | PrefixedName
 iri = IRIREF | PrefixedName
@@ -276,11 +279,8 @@ iri = IRIREF | PrefixedName
 String = STRING_LITERAL_LONG1 | STRING_LITERAL_LONG2 | STRING_LITERAL1 | STRING_LITERAL2 
 
 # [129] RDFLiteral ::= String ( LANGTAG | ( '^^' iri ) )?
-LangTaggedLiteral = String + Optional( LANGTAG ).leaveWhitespace()
-LangTaggedLiteral.setParseAction(setLanguage)
-DataTypedLiteral = String + Optional( Combine(Suppress('^^') + iri) ).leaveWhitespace()
-DataTypedLiteral.setParseAction(setDataType)
-RDFLiteral = LangTaggedLiteral | DataTypedLiteral | String
+
+RDFLiteral = Comp('literal', Param('string', String) + Optional(Param('lang', LANGTAG.leaveWhitespace()) | Literal('^^').leaveWhitespace() + Param('datatype', iri).leaveWhitespace()))
 
 # [132] NumericLiteralPositive ::= INTEGER_POSITIVE | DECIMAL_POSITIVE | DOUBLE_POSITIVE
 NumericLiteralPositive = DOUBLE_POSITIVE | DECIMAL_POSITIVE | INTEGER_POSITIVE 
@@ -567,11 +567,11 @@ Aggregate = Comp('Aggregate_Count', Keyword('COUNT') + '(' + Param('distinct', _
 # | NotExistsFunc
 
 BuiltInCall = Aggregate \
-    | Comp('Builtin_STR', Keyword('STR') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_LANG', Keyword('LANG') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_LANGMATCHES', Keyword('LANGMATCHES') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
-    | Comp('Builtin_DATATYPE', Keyword('DATATYPE') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_BOUND', Keyword('BOUND') + '(' + Var + ')' ) \
+    | Comp('Builtin_STR', Keyword('STR') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_STR) \
+    | Comp('Builtin_LANG', Keyword('LANG') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_LANG) \
+    | Comp('Builtin_LANGMATCHES', Keyword('LANGMATCHES') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_LANGMATCHES) \
+    | Comp('Builtin_DATATYPE', Keyword('DATATYPE') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_DATATYPE) \
+    | Comp('Builtin_BOUND', Keyword('BOUND') + '(' + Param('arg', Var) + ')' ).setEvalFn(op.Builtin_BOUND) \
     | Comp('Builtin_IRI', Keyword('IRI') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_URI', Keyword('URI') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_BNODE', Keyword('BNODE') + ( '(' + Param('arg', Expression) + ')' | NIL ) ) \
@@ -582,10 +582,10 @@ BuiltInCall = Aggregate \
     | Comp('Builtin_ROUND', Keyword('ROUND') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_CONCAT', Keyword('CONCAT') + Param('arg', ExpressionList ) ) \
     | SubstringExpression \
-    | Comp('Builtin_STRLEN', Keyword('STRLEN') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_STRLEN', Keyword('STRLEN') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_STRLEN) \
     | StrReplaceExpression \
-    | Comp('Builtin_UCASE', Keyword('UCASE') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_LCASE', Keyword('LCASE') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_UCASE', Keyword('UCASE') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_UCASE) \
+    | Comp('Builtin_LCASE', Keyword('LCASE') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_LCASE) \
     | Comp('Builtin_ENCODE_FOR_URI', Keyword('ENCODE_FOR_URI') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_CONTAINS', Keyword('CONTAINS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
     | Comp('Builtin_STRSTARTS', Keyword('STRSTARTS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
@@ -612,7 +612,7 @@ BuiltInCall = Aggregate \
     | Comp('Builtin_IF', Keyword('IF') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ',' + Param('arg3', Expression) + ')' ) \
     | Comp('Builtin_STRLANG', Keyword('STRLANG') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
     | Comp('Builtin_STRDT', Keyword('STRDT') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
-    | Comp('Builtin_sameTerm', Keyword('sameTerm') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_sameTerm', Keyword('sameTerm') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_sameTerm) \
     | Comp('Builtin_isIRI', Keyword('isIRI') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_isURI', Keyword('isURI') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_isBLANK', Keyword('isBLANK') + '(' + Param('arg', Expression) + ')' ) \
@@ -682,10 +682,10 @@ RelationalExpression = Comp('RelationalExpression', Param('expr', NumericExpress
 ValueLogical = RelationalExpression
 
 # [112] ConditionalAndExpression ::= ValueLogical ( '&&' ValueLogical )*
-ConditionalAndExpression = ValueLogical + ZeroOrMore( '&&' + ValueLogical )
+ConditionalAndExpression = Comp('ConditionalAndExpression', Param('expr', ValueLogical) + ZeroOrMore( '&&' + ParamList('other', ValueLogical ))).setEvalFn(op.ConditionalAndExpression)
 
 # [111] ConditionalOrExpression ::= ConditionalAndExpression ( '||' ConditionalAndExpression )*
-ConditionalOrExpression = ConditionalAndExpression + ZeroOrMore( '||' + ConditionalAndExpression )
+ConditionalOrExpression = Comp('ConditionalOrExpression', Param('expr', ConditionalAndExpression) + ZeroOrMore( '||' + ParamList('other', ConditionalAndExpression ))).setEvalFn(op.ConditionalOrExpression)
 
 # [110] Expression ::= ConditionalOrExpression
 Expression << ConditionalOrExpression
@@ -802,7 +802,7 @@ ConstructTemplate = '{' + Optional(ConstructTriples) + '}'
 
 
 # [57] OptionalGraphPattern ::= 'OPTIONAL' GroupGraphPattern
-OptionalGraphPattern = Keyword('OPTIONAL') + GroupGraphPattern
+OptionalGraphPattern = Comp('OptionalGraphPattern', Keyword('OPTIONAL') + Param('graph', GroupGraphPattern))
 
 # [58] GraphGraphPattern ::= 'GRAPH' VarOrIri GroupGraphPattern
 GraphGraphPattern = Keyword('GRAPH') + VarOrIri + GroupGraphPattern
@@ -850,7 +850,7 @@ OffsetClause = Keyword('OFFSET') + Param('offset', INTEGER)
 LimitOffsetClauses = Comp ( 'LimitOffsetClauses', LimitClause + Optional(OffsetClause) | OffsetClause + Optional(LimitClause) ) 
 
 # [18] SolutionModifier ::= GroupClause? HavingClause? OrderClause? LimitOffsetClauses?
-SolutionModifier = Optional(GroupClause) + Optional(HavingClause) + Optional(OrderClause) + Optional(LimitOffsetClauses) 
+SolutionModifier =  Optional(Param('groupby', GroupClause)) + Optional(Param('having', HavingClause)) + Optional(Param('orderby', OrderClause)) + Optional(Param('limitoffset', LimitOffsetClauses))
 
 
 # [9] SelectClause ::= 'SELECT' ( 'DISTINCT' | 'REDUCED' )? ( ( Var | ( '(' Expression 'AS' Var ')' ) )+ | '*' )
@@ -863,20 +863,20 @@ WhereClause = Optional(Keyword('WHERE')) + Param('where', GroupGraphPattern )
 SubSelect = Group ( SelectClause + WhereClause + SolutionModifier + ValuesClause )
 
 # [53] GroupGraphPattern ::= '{' ( SubSelect | GroupGraphPatternSub ) '}'
-GroupGraphPattern << Group( Suppress('{') + ( SubSelect | GroupGraphPatternSub ) + Suppress('}') ) 
+GroupGraphPattern << Suppress('{') + ( SubSelect | GroupGraphPatternSub ) + Suppress('}') 
 
 # [7] SelectQuery ::= SelectClause DatasetClause* WhereClause SolutionModifier
-SelectQuery = Comp('SelectQuery', SelectClause + Param('from', ZeroOrMore(DatasetClause) ) + WhereClause + Param('solutionmodifier', SolutionModifier))
+SelectQuery = Comp('SelectQuery', SelectClause + Param('from', ZeroOrMore(DatasetClause) ) + WhereClause + SolutionModifier)
 #SelectQuery.setParseAction(lambda x: components.SelectQuery(*x))
 
 # [10] ConstructQuery ::= 'CONSTRUCT' ( ConstructTemplate DatasetClause* WhereClause SolutionModifier | DatasetClause* 'WHERE' '{' TriplesTemplate? '}' SolutionModifier )
-ConstructQuery = Keyword('CONSTRUCT') + ( ConstructTemplate + ZeroOrMore(DatasetClause) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier )
+ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( ConstructTemplate + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier ))
 
 # [12] AskQuery ::= 'ASK' DatasetClause* WhereClause SolutionModifier
-AskQuery = Keyword('ASK') + ZeroOrMore(DatasetClause) + WhereClause + SolutionModifier
+AskQuery = Comp('AskQuery', Keyword('ASK') + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier)
 
 # [11] DescribeQuery ::= 'DESCRIBE' ( VarOrIri+ | '*' ) DatasetClause* WhereClause? SolutionModifier
-DescribeQuery = Keyword('DESCRIBE') + ( OneOrMore(VarOrIri) | '*' ) + ZeroOrMore(DatasetClause) + Optional(WhereClause) + SolutionModifier
+DescribeQuery = Comp('DescribeQuery', Keyword('DESCRIBE') + (OneOrMore(ParamList('var',VarOrIri)) | '*' ) + Param('from', ZeroOrMore(DatasetClause)) + Optional(WhereClause) + SolutionModifier)
 
 # [29] Update ::= Prologue ( Update1 ( ';' Update )? )?
 Update = Forward()

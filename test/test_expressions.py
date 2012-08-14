@@ -1,8 +1,7 @@
 
 
 import rdflib_sparql.parser as p 
-from rdflib_sparql.processor import QueryContext
-from rdflib_sparql.components import SPARQLError
+from rdflib_sparql.sparql import QueryContext, SPARQLError
 
 from rdflib import Variable, Literal
 
@@ -85,9 +84,38 @@ def test_comparisons():
     eq(p.Expression.parseString('2=2e0')[0].eval(),True)
 
     eq(p.Expression.parseString('2="cake"')[0].eval(),False)
+
+def test_comparisons_var(): 
+
+    ctx=QueryContext()
+    ctx[Variable('x')]=Literal(2)
+
+    eq(p.Expression.parseString('?x<3')[0].eval(ctx),True)
+    eq(p.Expression.parseString('?x<3.0')[0].eval(ctx),True)
+    eq(p.Expression.parseString('?x<3e0')[0].eval(ctx),True)
+
+    eq(p.Expression.parseString('?x<2.1')[0].eval(ctx),True)
+    eq(p.Expression.parseString('?x<21e-1')[0].eval(ctx),True)
+
+    eq(p.Expression.parseString('?x=2.0')[0].eval(ctx),True)
+    eq(p.Expression.parseString('?x=2e0')[0].eval(ctx),True)
+
+    eq(p.Expression.parseString('?x="cake"')[0].eval(ctx),False)
+
+    ctx[Variable('x')]=Literal(4)
+
+    eq(p.Expression.parseString('?x<3')[0].eval(ctx),False)
+    eq(p.Expression.parseString('?x<3.0')[0].eval(ctx),False)
+    eq(p.Expression.parseString('?x<3e0')[0].eval(ctx),False)
+
+
     
+def test_and_or():
     
-    
+    eq(p.Expression.parseString('3>2 && 3>1')[0].eval(),True)
+    eq(p.Expression.parseString('3>2 && 3>4 || 2>1')[0].eval(),True)
+    eq(p.Expression.parseString('2>1 || 3>2 && 3>4')[0].eval(),True)
+    eq(p.Expression.parseString('(2>1 || 3>2) && 3>4')[0].eval(),False)
 
 
 if __name__=='__main__':

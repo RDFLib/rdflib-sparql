@@ -11,7 +11,6 @@ class RDFResultParser(ResultParser):
 class RDFResult(Result):
     
     def __init__(self, source): 
-        Result.__init__(self, 'SELECT')
         
         if not isinstance(source,Graph):
             graph=Graph()
@@ -19,15 +18,28 @@ class RDFResult(Result):
         else: 
             graph=source
             
-        rs=graph.value(RDF.type, RS.ResultSet) # there better be only one :)
+        rs=graph.value(predicate=RDF.type, object=RS.ResultSet) # there better be only one :)
 
-        self.vars=[Variable(v) for v in graph.objects(rs,RS.resultVariable)]
-        
-        self.bindings=[]
+        askAnswer=graph.value(rs, RS.boolean)
 
-        for s in graph.objects(rs,RS.solution): 
-            sol={}
-            for b in graph.objects(s,RS.bindings):
-                sol[Variable(graph.value(b,RS.variable))]=graph.value(b,RS.value)
+        if askAnswer!=None:
+            type_='ASK'
+        else:
+            type_='SELECT'
 
-        
+        Result.__init__(self, type_)
+
+
+        if type_=='SELECT':
+            self.vars=[Variable(v) for v in graph.objects(rs,RS.resultVariable)]
+
+            self.bindings=[]
+
+            for s in graph.objects(rs,RS.solution): 
+                sol={}
+                for b in graph.objects(s,RS.binding):
+                    sol[Variable(graph.value(b,RS.variable))]=graph.value(b,RS.value)
+                self.bindings.append(sol)
+        elif type_=='ASK':
+            self.askAnswer=bool(askAnswer)
+

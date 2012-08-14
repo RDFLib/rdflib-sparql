@@ -1,0 +1,20 @@
+Thu Aug  9 22:34:16 CEST 2012
+FAILED (errors=163, failures=46)
+
+Fri Aug 10 11:39:17 CEST 2012
+FAILED (errors=161, failures=62)
+
+Fri Aug 10 14:16:27 CEST 2012
+FAILED (errors=161, failures=49)
+
+Fri Aug 10 22:34:29 CEST 2012
+FAILED (errors=152, failures=40)
+
+Sat Aug 11 22:00:28 CEST 2012
+FAILED (errors=128, failures=47)
+
+# implemented ASK, fixed ttl result sets
+FAILED (errors=82, failures=86)
+
+# errors for operators =, != with unmatching datatypes
+FAILED (errors=63, failures=103)
