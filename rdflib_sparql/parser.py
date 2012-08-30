@@ -40,6 +40,7 @@ def expandTriples(terms):
     """
     Expand ; and , syntax for repeat predicates, subjects
     """
+    #import pdb; pdb.set_trace()
     try:
         res=[]
         if DEBUG:
@@ -52,7 +53,8 @@ def expandTriples(terms):
                 res.append(res[i-3])
             elif isinstance(t,list):
                 res.append(t[0])
-                res+=t
+                if len(t)>1:
+                    res+=t
             elif isinstance(t,ParseResults):
                 res+=t.asList()
             elif t!='.': 
@@ -74,6 +76,7 @@ def expandBNodeTriples(terms):
     """
     expand [ ?p ?o ] syntax for implicit bnodes
     """
+    #import pdb; pdb.set_trace()
     try:
         if DEBUG:
             print "Bnode terms",terms
@@ -793,10 +796,10 @@ ValuesClause = Optional( Keyword('VALUES') + DataBlock )
 
 # [74] ConstructTriples ::= TriplesSameSubject ( '.' Optional(ConstructTriples) )?
 ConstructTriples = Forward()
-ConstructTriples << ( TriplesSameSubject + Optional( '.' + Optional(ConstructTriples) ) )
+ConstructTriples << ( TriplesSameSubject + Optional( Suppress('.') + Optional(ConstructTriples) ) )
 
 # [73] ConstructTemplate ::= '{' Optional(ConstructTriples) '}'
-ConstructTemplate = '{' + Optional(ConstructTriples) + '}'
+ConstructTemplate = Suppress('{') + Optional(ConstructTriples) + Suppress('}')
 
 
 
@@ -870,7 +873,7 @@ SelectQuery = Comp('SelectQuery', SelectClause + Param('from', ZeroOrMore(Datase
 #SelectQuery.setParseAction(lambda x: components.SelectQuery(*x))
 
 # [10] ConstructQuery ::= 'CONSTRUCT' ( ConstructTemplate DatasetClause* WhereClause SolutionModifier | DatasetClause* 'WHERE' '{' TriplesTemplate? '}' SolutionModifier )
-ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( ConstructTemplate + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier ))
+ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( Param('template', ConstructTemplate) + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier ) )
 
 # [12] AskQuery ::= 'ASK' DatasetClause* WhereClause SolutionModifier
 AskQuery = Comp('AskQuery', Keyword('ASK') + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier)

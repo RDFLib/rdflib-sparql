@@ -1,4 +1,4 @@
-from rdflib import Variable, URIRef, Literal
+from rdflib import Variable, URIRef, Literal, Graph
 
 from rdflib_sparql.parserutils import CompValue
 from rdflib_sparql.operators import simplify, EBV
@@ -8,7 +8,9 @@ from algebra import findFiltersQuery
 
 
 def triples(l): 
-    assert (len(l) % 3) == 0, 'these aint triples'
+    if (len(l) % 3) != 0: 
+        import pdb ; pdb.set_trace()
+        raise Exception('these aint triples')
     return [(l[x],l[x+1],l[x+2]) for x in range(0,len(l),3)]
 
 def matchBGP(bgp, ctx): 
@@ -16,12 +18,11 @@ def matchBGP(bgp, ctx):
     if not bgp:
         yield ctx
         return 
-
     
     s,p,o=[ctx.absolutize(x) for x in bgp[0]]
 
     #import nose.tools ;nose.tools.set_trace()
-    #import pdb ; pdb.set_trace()
+    
 
     _s=ctx[s]
     _p=ctx[p]
@@ -96,7 +97,7 @@ def evalQuery(graph, query, initBindings, initNs):
         elif main.name=='AskQuery':
             return evalAskQuery(ctx,main)
         elif main.name=='ConstructQuery':
-            raise Exception('CONSTRUCT not implemented')
+            return evalConstructQuery(ctx,main)
         elif main.name=='DescribeQuery':
             raise Exception('DESCRIBE not implemented')
         else: 
@@ -160,8 +161,6 @@ def evalAskQuery(ctx, query):
 
     return res
 
-
-
 def evalSelectQuery(ctx, query):
 
     #import pdb; pdb.set_trace()
@@ -222,9 +221,70 @@ def evalSelectQuery(ctx, query):
 
     if selectVars:
         res["vars_"]=selectVars    
-    elif bindings:
-        res["vars_"]=bindings[0].keys()
     else: 
-        res["vars_"]=[]
+        res["vars_"]=ctx.vars
+
+    return res
+
+
+def evalConstructQuery(ctx, query):
+
+    #import pdb; pdb.set_trace()
+
+    limit=None
+    offset=0
+
+    if query.limitoffset:
+        if query.limitoffset.limit: 
+            limit=query.limitoffset.limit.toPython()
+        if query.limitoffset.offset:             
+            offset=query.limitoffset.offset.toPython()
+
+
+    filters=findFiltersQuery(query)
+    print filters
+    filters=simplify(filters) # TODO move me!
+    print filters
+
+    template=triples(query.template)
+
+    graph=Graph()
+
+    i=0
+    for c in evalParts(ctx, query.where.part):
+        try: 
+            if filters and not EBV(filters.eval(c)):
+                print "Filter fail",c
+                continue
+        except SPARQLError:
+            print "Filter ERRROR fail",c
+            continue
+        except NotBoundError:
+            print "Filter NotBound fail",c
+            continue
+
+        if i>=offset:
+
+            for t in template:
+                s,p,o=[c.absolutize(x) for x in t]
+
+                _s=ctx[s]
+                _p=ctx[p]
+                _o=ctx[o]
+                
+                if not isinstance(_s, Variable) and \
+                        not isinstance(_p, Variable) and \
+                        not isinstance(_o, Variable):
+                
+                    graph.add((_s,_p,_o))
+
+        i+=1
+        if limit!=None and i>=limit+offset: 
+            break
+
+    res={}
+    res["type_"]="CONSTRUCT"
+    res["graph"]=graph
+    
 
     return res

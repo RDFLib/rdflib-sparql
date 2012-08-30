@@ -12,6 +12,7 @@ from nose.tools import eq_ as eq
 DEBUG=True
 DEBUG=False
 DETAILEDASSERT=True
+#DETAILEDASSERT=False
 
 MF=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#')
 QT=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-query#')
@@ -36,6 +37,10 @@ def do_test_single(t):
             resg=Graph()
             resg.load(resfile, format='turtle')
             res=RDFResultParser().parse(resg)
+        elif resfile.endswith('rdf'):
+            resg=Graph()
+            resg.load(resfile)
+            res=RDFResultParser().parse(resg)            
         else:
             res=Result.parse(file(resfile[7:]),format='xml') # relies on rdfextras
 
@@ -58,13 +63,14 @@ def do_test_single(t):
                 eq(set(frozenset(x.iteritems()) for x in res.bindings), set(frozenset(x.iteritems()) for x in res2.bindings), 'Bindings do not match: %r != %r'%(res.bindings, res2.bindings))
             elif res.type=='ASK':
                 eq(res.askAnswer, res2.askAnswer, "Ask answer does not match: %r != %r"%(res.askAnswer, res2.askAnswer))
+                
 
 
     except Exception,e:
 
         fails[e.message]+=1
 
-        if DEBUG:
+        if DEBUG: # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
             print "----------------- DATA --------------------"
             print file(data[7:]).read()
             print "----------------- Query -------------------"            

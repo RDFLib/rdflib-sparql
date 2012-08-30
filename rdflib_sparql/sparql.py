@@ -42,6 +42,8 @@ class QueryContext(object):
         self.graph=graph
         self.namespace_manager=NamespaceManager(Graph())  # ns man needs a store
         self.base=None
+        self.vars=set()
+
 
     def __getitem__(self, key):
         # in SPARQL BNodes are just labels
@@ -89,10 +91,10 @@ class QueryContext(object):
             if iri.name=='pname':
                 return self.resolvePName(iri.prefix, iri.localname)
             if iri.name=='literal':
-                return Literal(iri.string, lang=iri.lang, datatype=self.absolutize(iri.datatype))
-        if not isinstance(iri, URIRef): 
-            return iri
-        if not ':' in iri: # TODO: Better check for relative URI?
+                return Literal(iri.string, lang=iri.lang, datatype=self.absolutize(iri.datatype))        
+        elif isinstance(iri, Variable): 
+            self.vars.add(iri)
+        elif isinstance(iri,URIRef) and not ':' in iri: # TODO: Better check for relative URI?
             return URIRef(self.base+iri)
         return iri
 

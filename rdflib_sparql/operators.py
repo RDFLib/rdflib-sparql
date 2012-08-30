@@ -1,7 +1,7 @@
 import re
 import operator as pyop # python operators
 
-from rdflib_sparql.parserutils import CompValue
+from rdflib_sparql.parserutils import CompValue, Expr
 from rdflib import BNode, Variable, Literal, XSD
 from rdflib.term import Node
 
@@ -117,7 +117,7 @@ def MultiplicativeExpression(e,ctx):
 
     # because of the way the mul-expr production handled operator precedence
     # we sometimes have nothing to do
-    if other is not None: 
+    if other is None: 
         return expr
 
     res=numeric(expr)
@@ -137,7 +137,7 @@ def AdditiveExpression(e,ctx):
 
     # because of the way the add-expr production handled operator precedence
     # we sometimes have nothing to do
-    if other is not None: 
+    if other is None: 
         return expr
 
     res=numeric(expr)
@@ -201,7 +201,7 @@ def ConditionalAndExpression(e, ctx):
 
     # because of the way the add-expr production handled operator precedence
     # we sometimes have nothing to do
-    if other is not None: 
+    if other is None: 
         return expr
     
     return Literal(all(EBV(x) for x in [expr]+other))
@@ -215,7 +215,7 @@ def ConditionalOrExpression(e, ctx):
 
     # because of the way the add-expr production handled operator precedence
     # we sometimes have nothing to do
-    if other is not None: 
+    if other is None: 
         return expr
     
     return Literal(any(EBV(x) for x in [expr]+other))
@@ -227,7 +227,7 @@ def and_(*args):
     
     a={ 'expr': args[0], 'other': list(args[1:]) }
 
-    return CompValue('ConditionalAndExpression', a, ConditionalAndExpression)
+    return Expr('ConditionalAndExpression', a, ConditionalAndExpression)
     
 
 def simplify(expr): 
@@ -238,7 +238,7 @@ def simplify(expr):
         return map(simplify, expr)
     if not isinstance(expr, CompValue): return expr
     if expr.name.endswith('Expression'):
-        if not expr.other:
+        if expr.other is None:
             return simplify(expr.expr)
         
     for k in expr.keys():

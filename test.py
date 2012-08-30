@@ -29,8 +29,11 @@ s=SPARQLProcessor(g)
 
 try:
 
+    r=s.query('''prefix : <urn:> select * where { ?x :p [ :v1 ?v1 ; :v2 ?v2 ] }''')
+    #r=s.query('''CONSTRUCT { ?a <urn:name> ?b } WHERE { ?a <urn:x> ?b }''')
+
     #r=s.query('''SELECT  * WHERE { ?s <urn:b> 'cake'^^<urn:cake> }''')
-    r=s.query('''ASK WHERE { ?s <urn:x> ?o  OPTIONAL { ?o <urn:y> ?o2 } }''')
+    #r=s.query('''ASK WHERE { ?s <urn:x> ?o  OPTIONAL { ?o <urn:y> ?o2 } }''')
     
     #r=s.query('''PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT  * WHERE { ?s a foaf:Person ; foaf:name 'Martin May' }''')
     #r=s.query('''PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT  * WHERE { ?s a foaf:Person ; foaf:name ?name . FILTER (?name='Martin May') }''')

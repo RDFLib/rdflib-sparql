@@ -20,12 +20,21 @@ class RDFResult(Result):
             
         rs=graph.value(predicate=RDF.type, object=RS.ResultSet) # there better be only one :)
 
-        askAnswer=graph.value(rs, RS.boolean)
+        if rs is None: 
+            type_='CONSTRUCT'
 
-        if askAnswer!=None:
-            type_='ASK'
+            # use a new graph
+            g=Graph()
+            g+=graph
+
         else:
-            type_='SELECT'
+
+            askAnswer=graph.value(rs, RS.boolean)
+
+            if askAnswer!=None:
+                type_='ASK'
+            else:
+                type_='SELECT'
 
         Result.__init__(self, type_)
 
@@ -42,4 +51,6 @@ class RDFResult(Result):
                 self.bindings.append(sol)
         elif type_=='ASK':
             self.askAnswer=bool(askAnswer)
+        elif type_=='CONSTRUCT':
+            self.graph=g
 
