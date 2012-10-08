@@ -21,3 +21,9 @@ FAILED (errors=63, failures=103)
 
 # construct result reading
 FAILED (errors=52, failures=90)
+
+Sun Oct  7 10:48:50 CEST 2012
+# more builtin functions, fixed bnode property-list triples
+FAILED (errors=49, failures=98)
+
+

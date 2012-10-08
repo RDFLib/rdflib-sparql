@@ -118,18 +118,33 @@ def evalPart(ctx, part):
             yield c
 
         if not solutions: yield ctx # optional!            
+    elif part.name=='GroupOrUnionGraphPattern':
+        pass
     else: 
         #import pdb ; pdb.set_trace()
         raise Exception('I dont know: %s'%part.name)
 
 def evalParts(ctx, parts):
+
+    filters=findFiltersQuery(parts)
+    filters=simplify(filters) # TODO move me!
+
     if not parts:
         yield ctx
         return
 
     for c in evalPart(ctx, parts[0]): 
         for s in evalParts(c, parts[1:]):
-            yield s
+            try: 
+                if filters and not EBV(filters.eval(s)):
+                    print "Filter fail",s
+                else: 
+                    yield s
+            except SPARQLError, e:
+                print "Filter ERRROR fail",e,s
+
+            except NotBoundError:
+                print "Filter NotBound fail",s
     
 
 def evalAskQuery(ctx, query):            
@@ -139,19 +154,9 @@ def evalAskQuery(ctx, query):
     if query.limitoffset:
         raise Exception("As far as I know limit and offset make no sense for ASK queries.")
 
-    filters=findFiltersQuery(query)
-    filters=simplify(filters) # TODO move me!
-
     answer=False
 
     for c in evalParts(ctx, query.where.part):
-        try: 
-            if filters and not EBV(filters.eval(c)):
-                print "Filter fail",c
-                continue
-        except NotBoundError:
-            print "Filter NotBound fail",c
-            continue
         answer=True
         break
         
@@ -182,23 +187,8 @@ def evalSelectQuery(ctx, query):
     distinct=query.modifier and query.modifier=='DISTINCT'
     distinctSet=set()
 
-    filters=findFiltersQuery(query)
-    print filters
-    filters=simplify(filters) # TODO move me!
-    print filters
-
     i=0
     for c in evalParts(ctx, query.where.part):
-        try: 
-            if filters and not EBV(filters.eval(c)):
-                print "Filter fail",c
-                continue
-        except SPARQLError:
-            print "Filter ERRROR fail",c
-            continue
-        except NotBoundError:
-            print "Filter NotBound fail",c
-            continue
 
         if i>=offset:
             solution=c.solution(selectVars)
@@ -240,28 +230,12 @@ def evalConstructQuery(ctx, query):
         if query.limitoffset.offset:             
             offset=query.limitoffset.offset.toPython()
 
-
-    filters=findFiltersQuery(query)
-    print filters
-    filters=simplify(filters) # TODO move me!
-    print filters
-
     template=triples(query.template)
 
     graph=Graph()
 
     i=0
     for c in evalParts(ctx, query.where.part):
-        try: 
-            if filters and not EBV(filters.eval(c)):
-                print "Filter fail",c
-                continue
-        except SPARQLError:
-            print "Filter ERRROR fail",c
-            continue
-        except NotBoundError:
-            print "Filter NotBound fail",c
-            continue
 
         if i>=offset:
 

@@ -1,3 +1,5 @@
+import collections
+
 from rdflib.namespace import NamespaceManager
 from rdflib import Variable, BNode, Graph, URIRef, Literal
 
@@ -43,6 +45,8 @@ class QueryContext(object):
         self.namespace_manager=NamespaceManager(Graph())  # ns man needs a store
         self.base=None
         self.vars=set()
+
+        self.bnodes=collections.defaultdict(BNode)
 
 
     def __getitem__(self, key):

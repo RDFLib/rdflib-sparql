@@ -45,6 +45,7 @@ def expandTriples(terms):
         res=[]
         if DEBUG:
             print "Terms", terms
+        l=len(terms)
         for i,t in enumerate(terms):
             if t==',':
                 res.append(res[i-3])
@@ -52,9 +53,16 @@ def expandTriples(terms):
             elif t==';':
                 res.append(res[i-3])
             elif isinstance(t,list):
-                res.append(t[0])
-                if len(t)>1:
+                # BlankNodePropertyList 
+                # is this bnode the object of previous triples?
+                if (i%3)==2: 
+                    res.append(t[0])
+                # is this a single [] ?
+                if len(t)>1: 
                     res+=t
+                # is this bnode the subject of more triples?
+                if i+1<l and terms[i+1]!=".": 
+                    res.append(t[0])
             elif isinstance(t,ParseResults):
                 res+=t.asList()
             elif t!='.': 
@@ -575,14 +583,14 @@ BuiltInCall = Aggregate \
     | Comp('Builtin_LANGMATCHES', Keyword('LANGMATCHES') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_LANGMATCHES) \
     | Comp('Builtin_DATATYPE', Keyword('DATATYPE') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_DATATYPE) \
     | Comp('Builtin_BOUND', Keyword('BOUND') + '(' + Param('arg', Var) + ')' ).setEvalFn(op.Builtin_BOUND) \
-    | Comp('Builtin_IRI', Keyword('IRI') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_URI', Keyword('URI') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_BNODE', Keyword('BNODE') + ( '(' + Param('arg', Expression) + ')' | NIL ) ) \
-    | Comp('Builtin_RAND', Keyword('RAND') + NIL ) \
-    | Comp('Builtin_ABS', Keyword('ABS') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_CEIL', Keyword('CEIL') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_FLOOR', Keyword('FLOOR') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_ROUND', Keyword('ROUND') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_IRI', Keyword('IRI') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_IRI) \
+    | Comp('Builtin_URI', Keyword('URI') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_IRI) \
+    | Comp('Builtin_BNODE', Keyword('BNODE') + ( '(' + Param('arg', Expression) + ')' | NIL ) ).setEvalFn(op.Builtin_BNODE) \
+    | Comp('Builtin_RAND', Keyword('RAND') + NIL ).setEvalFn(op.Builtin_RAND) \
+    | Comp('Builtin_ABS', Keyword('ABS') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_ABS) \
+    | Comp('Builtin_CEIL', Keyword('CEIL') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_CEIL) \
+    | Comp('Builtin_FLOOR', Keyword('FLOOR') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_FLOOR) \
+    | Comp('Builtin_ROUND', Keyword('ROUND') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_ROUND) \
     | Comp('Builtin_CONCAT', Keyword('CONCAT') + Param('arg', ExpressionList ) ) \
     | SubstringExpression \
     | Comp('Builtin_STRLEN', Keyword('STRLEN') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_STRLEN) \

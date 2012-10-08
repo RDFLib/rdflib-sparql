@@ -1,8 +1,11 @@
 import re
+import math
+import random
+
 import operator as pyop # python operators
 
 from rdflib_sparql.parserutils import CompValue, Expr
-from rdflib import BNode, Variable, Literal, XSD
+from rdflib import URIRef, BNode, Variable, Literal, XSD
 from rdflib.term import Node
 
 from pyparsing import ParseResults
@@ -18,6 +21,74 @@ using setEvalFn
 """
 
 
+def Builtin_IRI(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-iri    
+    """
+
+    a=expr.arg
+
+    if isinstance(a, URIRef): 
+        return a
+    if isinstance(a, Literal): 
+        return URIRef(a)
+
+    raise SPARQLError('IRI function only accepts URIRefs or Literals/Strings!')
+
+
+def Builtin_BNODE(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-bnode
+    """
+
+    a=expr.arg
+
+    if a==None:
+        return BNode() 
+
+    if isinstance(a, Literal): 
+        return ctx.bnodes[a] # defaultdict does the right thing
+    
+    raise SPARQLError('BNode function only accepts no argument or literal/string')
+
+
+def Builtin_ABS(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-abs
+    """
+
+    return Literal(abs(numeric(expr.arg)))
+
+
+
+
+def Builtin_RAND(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#idp2133952
+    """
+
+    return Literal(random.random())
+
+
+def Builtin_CEIL(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-ceil
+    """
+
+    return Literal(math.ceil(numeric(expr.arg)))
+
+def Builtin_FLOOR(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-floor
+    """
+    return Literal(math.floor(numeric(expr.arg)))
+
+
+def Builtin_ROUND(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-round
+    """
+    return Literal(round(numeric(expr.arg)))
 
 
 def Builtin_REGEX(expr, ctx):

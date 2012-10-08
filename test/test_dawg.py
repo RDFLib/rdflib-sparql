@@ -1,6 +1,6 @@
 import collections
 
-from rdflib import Graph, Namespace, RDF
+from rdflib import Graph, Namespace, RDF, RDFS
 from rdflib.query import Result
 
 from rdflib_sparql.parser import parseQuery
@@ -8,9 +8,10 @@ from rdflib_sparql.processor import SPARQLProcessor
 from rdflib_sparql.results.rdfresults import RDFResultParser
 
 from nose.tools import eq_ as eq
+import nose
 
 DEBUG=True
-DEBUG=False
+#DEBUG=False
 DETAILEDASSERT=True
 #DETAILEDASSERT=False
 
@@ -22,7 +23,7 @@ NAME=None
 fails=collections.Counter()
 
 def do_test_single(t):
-    name,data,query,resfile=t
+    name,comment,data,query,resfile=t
 
     if NAME and name!=NAME: return
 
@@ -70,16 +71,22 @@ def do_test_single(t):
 
         fails[e.message]+=1
 
-        if DEBUG: # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
+        if DEBUG and not isinstance(e,AssertionError): # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
+            print name
+            print comment
             print "----------------- DATA --------------------"
             print file(data[7:]).read()
             print "----------------- Query -------------------"            
             print file(query[7:]).read()
+            print "----------------- Res -------------------"            
+            print file(resfile[7:]).read()
+
             print "----------------- Parsed ------------------"
-            print parseQuery(file(query[7:]).read())
-            import pdb
-            pdb.set_trace()
-        #nose.tools.set_trace()
+            pq=parseQuery(file(query[7:]).read())
+            print pq
+            #import pdb
+            #pdb.set_trace()
+            nose.tools.set_trace()
         raise
 
     
@@ -104,8 +111,9 @@ def read_manifest(f):
                 data=g.value(a, QT.data)
                 res=g.value(e, MF.result)
                 name=g.value(e, MF.name)
+                comment=g.value(e,RDFS.comment)
                 
-                yield str(name),str(data),str(query),str(res)
+                yield str(name),str(comment),str(data),str(query),str(res)
                 
                         
 

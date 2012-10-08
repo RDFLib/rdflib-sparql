@@ -81,6 +81,9 @@ class plist(list):
 
 class CompValue(OrderedDict):
 
+    """
+    """
+
     def __init__(self, name, dict_=None):        
         OrderedDict.__init__(self)
         self.name=name
@@ -183,4 +186,5 @@ if __name__=='__main__':
     print r
     print r[0].eval({})
 
+# hurrah for circular imports
 from rdflib_sparql.sparql import SPARQLError, NotBoundError
