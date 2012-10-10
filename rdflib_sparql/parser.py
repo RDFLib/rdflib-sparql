@@ -18,10 +18,7 @@ DEBUG=False
 # ---------------- ACTIONS 
 
 def neg(literal): 
-    try: 
-        return rdflib.Literal(-literal, datatype=literal.datatype)
-    except Exception, e:
-        print e
+    return rdflib.Literal(-literal, datatype=literal.datatype)
         
 
 def setLanguage(terms):
@@ -473,7 +470,7 @@ TriplesBlock << ( Param('triples',TriplesSameSubjectPath) + Optional( Suppress('
 
 
 # [66] MinusGraphPattern ::= 'MINUS' GroupGraphPattern
-MinusGraphPattern = Comp('MINUS', Keyword('MINUS') + Param('graph', GroupGraphPattern))
+MinusGraphPattern = Comp('MinusGraphPattern', Keyword('MINUS') + Param('graph', GroupGraphPattern))
 
 # [67] GroupOrUnionGraphPattern ::= GroupGraphPattern ( 'UNION' GroupGraphPattern )*
 GroupOrUnionGraphPattern = Comp('GroupOrUnionGraphPattern', ParamList('graph', GroupGraphPattern) + ZeroOrMore( Keyword('UNION') + ParamList('graph', GroupGraphPattern )))
@@ -816,16 +813,16 @@ ConstructTemplate = Suppress('{') + Optional(ConstructTriples) + Suppress('}')
 OptionalGraphPattern = Comp('OptionalGraphPattern', Keyword('OPTIONAL') + Param('graph', GroupGraphPattern))
 
 # [58] GraphGraphPattern ::= 'GRAPH' VarOrIri GroupGraphPattern
-GraphGraphPattern = Keyword('GRAPH') + VarOrIri + GroupGraphPattern
+GraphGraphPattern = Comp('GraphGraphPattern', Keyword('GRAPH') + Param('term', VarOrIri) + Param('graph', GroupGraphPattern))
 
 # [59] ServiceGraphPattern ::= 'SERVICE' _Silent VarOrIri GroupGraphPattern
 ServiceGraphPattern = Keyword('SERVICE') + _Silent + VarOrIri + GroupGraphPattern
 
 # [60] Bind ::= 'BIND' '(' Expression 'AS' Var ')'
-Bind = Group ( Keyword('BIND') + '(' + Expression + Keyword('AS') + Var + ')' )
+Bind = Comp ('Bind', Keyword('BIND') + '(' + Param('expr', Expression) + Keyword('AS') + Param('var', Var) + ')' )
 
 # [61] InlineData ::= 'VALUES' DataBlock
-InlineData = Keyword('VALUES') + DataBlock
+InlineData = Comp('InlineData', Keyword('VALUES') + Param('data', DataBlock))
 
 # [56] GraphPatternNotTriples ::= GroupOrUnionGraphPattern | OptionalGraphPattern | MinusGraphPattern | GraphGraphPattern | ServiceGraphPattern | Filter | Bind | InlineData
 GraphPatternNotTriples = GroupOrUnionGraphPattern | OptionalGraphPattern | MinusGraphPattern | GraphGraphPattern | ServiceGraphPattern | Filter | Bind | InlineData
@@ -871,7 +868,7 @@ SelectClause = Keyword('SELECT') + Optional(Param('modifier', Keyword('DISTINCT'
 WhereClause = Optional(Keyword('WHERE')) + Param('where', GroupGraphPattern )
 
 # [8] SubSelect ::= SelectClause WhereClause SolutionModifier ValuesClause
-SubSelect = Group ( SelectClause + WhereClause + SolutionModifier + ValuesClause )
+SubSelect = Comp ('SubSelect', SelectClause + WhereClause + SolutionModifier + ValuesClause )
 
 # [53] GroupGraphPattern ::= '{' ( SubSelect | GroupGraphPatternSub ) '}'
 GroupGraphPattern << Suppress('{') + ( SubSelect | GroupGraphPatternSub ) + Suppress('}') 

@@ -11,11 +11,38 @@ DEBUG=False
 if DEBUG: 
     import traceback
 
+"""
+Utility classes for creating an abstract-syntax tree out with pyparsing actions
+
+Lets you label and group parts of parser production rules
+
+For example:
+
+# [5] BaseDecl ::= 'BASE' IRIREF
+BaseDecl = Comp('Base', Keyword('BASE') + Param('iri',IRIREF))
+
+After parsing, this gives you back an CompValue object, 
+which is a dict/object with the paramters specified. 
+So you can access the parameters are attributes or as keys: 
+
+baseDecl.iri 
+
+Comp lets you set an evalFn that is bound to the eval method of
+the resulting CompValue 
+
+
+"""
+
+
 # This is an alternative 
 
 # Comp('Sum')( Param('x')(Number) + '+' + Param('y')(Number) )
 
 def value(ctx, val, variables=False):
+
+    """
+    utility function for evaluating something...
+    """
 
     if isinstance(val, Expr): 
         return val.eval(ctx) # recurse?
@@ -25,7 +52,7 @@ def value(ctx, val, variables=False):
         elif val.name=='pname':
             return ctx.absolutize(val)
         else: 
-            raise Exception("What do I do wit this CompValue? %s"%val)
+            raise Exception("What do I do with this CompValue? %s"%val)
 
     elif isinstance(val, list): 
         return [value(ctx,x) for x in val]
@@ -52,6 +79,11 @@ def value(ctx, val, variables=False):
 
 
 class ParamValue(object): 
+    """ 
+    The result of parsing a Param 
+    This just keeps the name/value
+    All cleverness is in the CompValue
+    """
     def __init__(self, name, tokenList, isList): 
         self.isList=isList
         self.name=name
@@ -61,6 +93,11 @@ class ParamValue(object):
         self.tokenList=tokenList
 
 class Param(TokenConverter): 
+    """
+    A pyparsing token for labelling a part of the parse-tree
+    if isList is true repeat occurrences of ParamList have 
+    their values merged in a list
+    """
     def __init__(self, name, expr, isList=False):
         self.name=name
         self.isList=isList
@@ -71,6 +108,9 @@ class Param(TokenConverter):
         return ParamValue(self.name, tokenList, self.isList)
 
 class ParamList(Param): 
+    """
+    A shortcut for a Param with isList=True
+    """
     def __init__(self,name,expr):
         Param.__init__(self,name,expr,True)
 
@@ -82,19 +122,22 @@ class plist(list):
 class CompValue(OrderedDict):
 
     """
+    The result of parsing a Comp
+    Any included Params are avaiable as Dict keys 
+    or as attributes
+
     """
 
-    def __init__(self, name, dict_=None):        
+    def __init__(self, name, **values):        
         OrderedDict.__init__(self)
         self.name=name
-        if dict_:
-            self.update(dict_)
+        self.update(values)
             
     def __str__(self):
-        return self.name+OrderedDict.__str__(self)
+        return self.name+"_"+OrderedDict.__str__(self)
 
     def __repr__(self):
-        return self.name+OrderedDict.__repr__(self)
+        return self.name+"_"+OrderedDict.__repr__(self)
 
     def _value(self,val,variables=False): 
         if self.ctx!=None: 
@@ -118,10 +161,12 @@ class CompValue(OrderedDict):
             return None
 
 class Expr(CompValue): 
-    """A comp value that can be evaluated"""
+    """
+    A CompValue that is evaluatable    
+    """
 
-    def __init__(self, name, dict_=None, evalfn=None):        
-        super(Expr,self).__init__(name,dict_)
+    def __init__(self, name, evalfn=None, **values):        
+        super(Expr,self).__init__(name,**values)
 
         self._evalfn=None
         if evalfn:
@@ -143,6 +188,14 @@ class Expr(CompValue):
 
 
 class Comp(TokenConverter): 
+
+    """
+    A pyparsing token for grouping together things with a label 
+    Any sub-tokens that are not Params will be ignored. 
+
+    Returns CompValue / Expr objects - depending on whether evalFn is set. 
+    """
+
     def __init__(self, name, expr): 
         TokenConverter.__init__(self, expr)
         self.name=name

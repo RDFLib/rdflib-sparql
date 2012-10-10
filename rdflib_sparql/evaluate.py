@@ -1,17 +1,10 @@
 from rdflib import Variable, URIRef, Literal, Graph
 
 from rdflib_sparql.parserutils import CompValue
-from rdflib_sparql.operators import simplify, EBV
+from rdflib_sparql.operators import EBV
 from rdflib_sparql.sparql import QueryContext, NotBoundError, AlreadyBound, SPARQLError
 
-from algebra import findFiltersQuery
 
-
-def triples(l): 
-    if (len(l) % 3) != 0: 
-        import pdb ; pdb.set_trace()
-        raise Exception('these aint triples')
-    return [(l[x],l[x+1],l[x+2]) for x in range(0,len(l),3)]
 
 def matchBGP(bgp, ctx): 
     
@@ -54,12 +47,6 @@ def matchBGP(bgp, ctx):
 
 
 
-def evalGroupOrUnionGraphPattern(ctx,pattern):
-    # pattern.graph is a list of GroupGraphPatterns to union
-    pass
-
-def evalGroupGraphPatternSub(ctx, pattern):
-    pass
     
 
 
@@ -89,6 +76,8 @@ def evalQuery(graph, query, initBindings, initNs):
     # valuesClause = query[2]
 
     main=query[1]
+
+    values=query[2] if len(query)>2 else None
 
     if isinstance(main, CompValue):
 
@@ -126,8 +115,6 @@ def evalPart(ctx, part):
 
 def evalParts(ctx, parts):
 
-    filters=findFiltersQuery(parts)
-    filters=simplify(filters) # TODO move me!
 
     if not parts:
         yield ctx

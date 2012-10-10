@@ -4,6 +4,7 @@ from rdflib.query import Processor, Result
 
 from rdflib_sparql.parser import parseQuery
 from rdflib_sparql.evaluate import evalQuery
+from rdflib_sparql.algebra import translateQuery
 
 """
 Code for tying SPARQL Engine into RDFLib
@@ -28,7 +29,7 @@ class SPARQLProcessor(Processor):
     def query(self, strOrQuery, initBindings={}, initNs={}, DEBUG=False):
         
         query=parseQuery(strOrQuery)
-
+        query=translateQuery(query)
         # clean-up / optimize!
         
         return SPARQLResult(**evalQuery(self.graph, query, initBindings, initNs))
