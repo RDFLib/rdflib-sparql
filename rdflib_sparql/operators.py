@@ -2,6 +2,8 @@ import re
 import math
 import random
 
+from decimal import Decimal
+
 import operator as pyop # python operators
 
 from rdflib_sparql.parserutils import CompValue, Expr
@@ -10,7 +12,7 @@ from rdflib.term import Node
 
 from pyparsing import ParseResults
 
-from rdflib_sparql.sparql import SPARQLError, NotBoundError
+from rdflib_sparql.sparql import SPARQLError, NotBoundError, SPARQLTypeError
 
 """ 
 This contains evaluation functions for expressions 
@@ -33,7 +35,7 @@ def Builtin_IRI(expr, ctx):
     if isinstance(a, Literal): 
         return URIRef(a)
 
-    raise SPARQLError('IRI function only accepts URIRefs or Literals/Strings!')
+    return SPARQLError('IRI function only accepts URIRefs or Literals/Strings!')
 
 
 def Builtin_BNODE(expr, ctx): 
@@ -49,7 +51,7 @@ def Builtin_BNODE(expr, ctx):
     if isinstance(a, Literal): 
         return ctx.bnodes[a] # defaultdict does the right thing
     
-    raise SPARQLError('BNode function only accepts no argument or literal/string')
+    return SPARQLError('BNode function only accepts no argument or literal/string')
 
 
 def Builtin_ABS(expr, ctx): 
@@ -118,7 +120,7 @@ def Builtin_REGEX(expr, ctx):
 
 def Builtin_STRLEN(e, ctx):
     l=e.arg
-    if not isinstance(l,Literal): raise SPARQLError('Can only get length of literal: %s'%l)
+    if not isinstance(l,Literal): return SPARQLError('Can only get length of literal: %s'%l)
     
     return Literal(len(l))
 
@@ -131,7 +133,7 @@ def Builtin_STR(e, ctx):
 
 def Builtin_LCASE(e, ctx):    
     l=e.arg
-    if not isinstance(l,Literal): raise SPARQLError('Can only lower-case literal: %s'%l)
+    if not isinstance(l,Literal): return SPARQLError('Can only lower-case literal: %s'%l)
     
     return Literal(l.tolower())
 
@@ -139,8 +141,8 @@ def Builtin_LANGMATCHES(e,ctx):
     langTag=e.arg1
     langRange=e.arg2
 
-    if not isinstance(langTag, Literal): raise SPARQLError('Expected a string/literal')
-    if not isinstance(langRange, Literal): raise SPARQLError('Expected a string/literal')
+    if not isinstance(langTag, Literal): return SPARQLError('Expected a string/literal')
+    if not isinstance(langRange, Literal): return SPARQLError('Expected a string/literal')
 
     return Literal(_lang_range_check(langRange,langTag))
     
@@ -181,6 +183,10 @@ def UnaryNot(expr,ctx):
 def UnaryMinus(expr,ctx):
     return Literal(-numeric(expr.expr))
 
+def UnaryPlus(expr,ctx):
+    return Literal(+numeric(expr.expr))
+
+
 def MultiplicativeExpression(e,ctx):
 
     expr=e.expr
@@ -215,6 +221,10 @@ def AdditiveExpression(e,ctx):
     for op,e in zip(e.op, other): 
         e=numeric(e)
         if op=='+':
+            if isinstance(e, Decimal) and isinstance(res, float): 
+                e=float(e)
+            if isinstance(e, float) and isinstance(res, Decimal): 
+                res=float(res)
             res+=e
         else: 
             res-=e
@@ -327,7 +337,7 @@ def numeric(expr):
     """    
 
     if not isinstance(expr, Literal): 
-        raise TypeError("%s is not a literal!"%expr)
+        raise SPARQLTypeError("%s is not a literal!"%expr)
 
     if expr.datatype not in (XSD.float, XSD.double, 
                          XSD.decimal, XSD.integer, 
@@ -335,7 +345,7 @@ def numeric(expr):
                          XSD.nonNegativeInteger, XSD.positiveInteger, 
                          XSD.unsignedLong, XSD.unsignedInt, XSD.unsignedShort, XSD.unsignedByte, 
                          XSD.long, XSD.int, XSD.short, XSD.byte ):
-        raise TypeError("%s does not have a numeric datatype!"%expr)
+        raise SPARQLTypeError("%s does not have a numeric datatype!"%expr)
     
     return expr.toPython()
 
@@ -366,12 +376,12 @@ def EBV(rt):
 
             if isinstance(pyRT,Literal):
                 #Type error, see: http://www.w3.org/TR/rdf-sparql-query/#ebv
-                raise TypeError("http://www.w3.org/TR/rdf-sparql-query/#ebv - Could not determine the EBV for : %s"%rt)
+                raise SPARQLTypeError("http://www.w3.org/TR/rdf-sparql-query/#ebv - Could not determine the EBV for : %s"%rt)
             else:
                 return pyRT != 0
 
     else:
-        raise TypeError("http://www.w3.org/TR/rdf-sparql-query/#ebv - Only literals have Boolean values! %s"%rt)
+        raise SPARQLTypeError("http://www.w3.org/TR/rdf-sparql-query/#ebv - Only literals have Boolean values! %s"%rt)
 
 
 

@@ -1,12 +1,18 @@
 
 
+from rdflib import Literal 
 
-from rdflib_sparql.parserutils import CompValue 
+from rdflib_sparql.parserutils import CompValue, Expr
 from rdflib_sparql.operators import and_, simplify
 
+
+TrueFilter=Expr('TrueFilter', lambda _1, _2: Literal(True))
+
+
 def triples(l): 
+    l=reduce(lambda x,y: x+y, l)
     if (len(l) % 3) != 0: 
-        import pdb ; pdb.set_trace()
+        #import pdb ; pdb.set_trace()
         raise Exception('these aint triples')
     return [(l[x],l[x+1],l[x+2]) for x in range(0,len(l),3)]
 
@@ -29,7 +35,7 @@ def findFilters(parts):
 
 
 def ToMultiSet(x): 
-    raise Exception('NotYetImplemented!')
+    return CompValue('ToMultiSet', p=x)
 
 def translateGroupOrUnionGraphPattern(graphPattern): 
     A=None
@@ -44,7 +50,7 @@ def translateGroupOrUnionGraphPattern(graphPattern):
 
 
 def translateGraphGraphPattern(graphPattern): 
-    return CompValue('Graph', term=graphPattern.term, graph=translateGroupGraphPattern(graphPattern.graph))
+    return CompValue('Graph', term=graphPattern.term, p=translateGroupGraphPattern(graphPattern.graph))
 
 def translateInlineData(graphPattern): 
     raise Exception("NotYetImplemented!")
@@ -53,6 +59,9 @@ def translateGroupGraphPattern(graphPattern):
     """
     http://www.w3.org/TR/sparql11-query/#convertGraphPattern
     """
+
+    if graphPattern.name=='SubSelect': 
+        return ToMultiSet(translate(graphPattern))
 
     filters=findFilters(graphPattern.part)
     filters=simplify(filters) # TODO move me!
@@ -76,7 +85,7 @@ def translateGroupGraphPattern(graphPattern):
             if A.name=='Filter':
                 G=CompValue('LeftJoin', p1=G, p2=A.p, expr=A.expr)
             else: 
-                G=CompValue('LeftJoin', p1=G, p2=A, expr=True)
+                G=CompValue('LeftJoin', p1=G, p2=A, expr=TrueFilter)
         elif p.name=='MinusGraphPattern': 
             G=CompValue('Minus', p1=G, p2=translateGroupGraphPattern(p.graph))
         elif p.name=='GroupOrUnionGraphPattern':
@@ -85,8 +94,8 @@ def translateGroupGraphPattern(graphPattern):
             G=CompValue('Join', p1=G, p2=translateGraphGraphPattern(p))
         elif p.name=='InlineData': 
             G=CompValue('Join', p1=G, p2=translateInlineData(p))
-        elif p.name=='BGP': 
-            G=CompValue('Join', p1=G, p2=p)
+        elif p.name in ('BGP', 'Extend'): 
+            G=CompValue('Join', p1=G, p2=p)            
         elif p.name=='Filter': 
             pass # already collected above
         else: 
@@ -105,20 +114,20 @@ def translate(q):
     q.where["part"]=translateGroupGraphPattern(q.where)
 
     if q.having: 
-        q.where["part"]=CompValue('Filter', expr=and_(q.having.condition), G=q.where["part"])
+        q.where["part"]=CompValue('Filter', expr=and_(q.having.condition), p=q.where["part"])
 
     return q
 
     
 def translateQuery(q): 
-    try: 
+#    try: 
         if len(q)>2:
             return q[0],CompValue('Join', p1=translate(q[1]), p2=ToMultiSet(q[2]))
         else: 
             return q[0],translate(q[1])
-    except:
-        import pdb
-        pdb.post_mortem()
+    # except:
+    #     import pdb
+    #     pdb.post_mortem()
 
 def pprintAlgebra(q): 
     def pp(p, ind="    "):
@@ -135,5 +144,11 @@ def pprintAlgebra(q):
 if __name__=='__main__': 
     import sys
     import rdflib_sparql.parser
+    import os.path
 
-    print pprintAlgebra(translateQuery(rdflib_sparql.parser.QueryUnit.parseString(sys.argv[1])))
+    if os.path.exists(sys.argv[1]): 
+        q=file(sys.argv[1]).read()
+    else: 
+        q=sys.argv[1]
+
+    print pprintAlgebra(translateQuery(rdflib_sparql.parser.QueryUnit.parseString(q)))

@@ -30,7 +30,6 @@ class SPARQLProcessor(Processor):
         
         query=parseQuery(strOrQuery)
         query=translateQuery(query)
-        # clean-up / optimize!
         
         return SPARQLResult(**evalQuery(self.graph, query, initBindings, initNs))
         

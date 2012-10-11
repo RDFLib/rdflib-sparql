@@ -237,13 +237,13 @@ STRING_LITERAL_LONG2.setParseAction(lambda x: rdflib.Literal(x[0][3:-3]))
 # [156] STRING_LITERAL1 ::= "'" ( ([^#x27#x5C#xA#xD]) | ECHAR )* "'"
 #STRING_LITERAL1 = Literal("'") + ZeroOrMore( Regex(u'[^\u0027\u005C\u000A\u000D]',flags=re.U) | ECHAR ) + "'"
 
-STRING_LITERAL1 = Regex(ur"'(?:[^\u0027\\\u000A\u000D]|\\['ntbrf])*'(?!')", flags=re.U)
+STRING_LITERAL1 = Regex(ur"'(?:[^\u0027\u000A\u000D\\]|\\['ntbrf])*'(?!')", flags=re.U)
 STRING_LITERAL1.setParseAction(lambda x: rdflib.Literal(x[0][1:-1]))
 
 # [157] STRING_LITERAL2 ::= '"' ( ([^#x22#x5C#xA#xD]) | ECHAR )* '"'
 #STRING_LITERAL2 = Literal('"') + ZeroOrMore ( Regex(u'[^\u0022\u005C\u000A\u000D]',flags=re.U) | ECHAR ) + '"'
 
-STRING_LITERAL2 = Regex(ur'"(?:[^\u0022\\\u000A\u000D]|\\["ntbrf])*"(?!")', flags=re.U)
+STRING_LITERAL2 = Regex(ur'"(?:[^\u0022\u000A\u000D\\]|\\["ntbrf\\])*"(?!")', flags=re.U)
 STRING_LITERAL2.setParseAction(lambda x: rdflib.Literal(x[0][1:-1]))
 
 # [161] NIL ::= '(' WS* ')'
@@ -466,7 +466,7 @@ TriplesSameSubjectPath.setParseAction(expandTriples)
 
 # [55] TriplesBlock ::= TriplesSameSubjectPath ( '.' Optional(TriplesBlock) )?
 TriplesBlock = Forward()
-TriplesBlock << ( Param('triples',TriplesSameSubjectPath) + Optional( Suppress('.') + Optional(TriplesBlock) ) )
+TriplesBlock << ( ParamList('triples',TriplesSameSubjectPath) + Optional( Suppress('.') + Optional(TriplesBlock) ) )
 
 
 # [66] MinusGraphPattern ::= 'MINUS' GroupGraphPattern
@@ -651,7 +651,7 @@ PrimaryExpression = BrackettedExpression | BuiltInCall | iriOrFunction | RDFLite
 # | '-' PrimaryExpression
 # | PrimaryExpression
 UnaryExpression = Comp('UnaryNot', '!' + Param('expr', PrimaryExpression)).setEvalFn(op.UnaryNot) \
-    | Comp('UnaryPlus', '+' + Param('expr', PrimaryExpression)) \
+    | Comp('UnaryPlus', '+' + Param('expr', PrimaryExpression)).setEvalFn(op.UnaryPlus) \
     | Comp('UnaryMinus', '-' + Param('expr', PrimaryExpression)).setEvalFn(op.UnaryMinus) \
     | PrimaryExpression
 
@@ -801,7 +801,7 @@ ValuesClause = Optional( Keyword('VALUES') + DataBlock )
 
 # [74] ConstructTriples ::= TriplesSameSubject ( '.' Optional(ConstructTriples) )?
 ConstructTriples = Forward()
-ConstructTriples << ( TriplesSameSubject + Optional( Suppress('.') + Optional(ConstructTriples) ) )
+ConstructTriples << ( ParamList('template', TriplesSameSubject) + Optional( Suppress('.') + Optional(ConstructTriples) ) )
 
 # [73] ConstructTemplate ::= '{' Optional(ConstructTriples) '}'
 ConstructTemplate = Suppress('{') + Optional(ConstructTriples) + Suppress('}')
@@ -878,7 +878,7 @@ SelectQuery = Comp('SelectQuery', SelectClause + Param('from', ZeroOrMore(Datase
 #SelectQuery.setParseAction(lambda x: components.SelectQuery(*x))
 
 # [10] ConstructQuery ::= 'CONSTRUCT' ( ConstructTemplate DatasetClause* WhereClause SolutionModifier | DatasetClause* 'WHERE' '{' TriplesTemplate? '}' SolutionModifier )
-ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( Param('template', ConstructTemplate) + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier ) )
+ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( ConstructTemplate  + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier ) )
 
 # [12] AskQuery ::= 'ASK' DatasetClause* WhereClause SolutionModifier
 AskQuery = Comp('AskQuery', Keyword('ASK') + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier)

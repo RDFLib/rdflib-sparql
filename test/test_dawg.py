@@ -1,6 +1,7 @@
 import collections
+import os.path
 
-from rdflib import Graph, Namespace, RDF, RDFS
+from rdflib import ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef
 from rdflib.query import Result
 
 from rdflib_sparql.parser import parseQuery
@@ -10,8 +11,13 @@ from rdflib_sparql.results.rdfresults import RDFResultParser
 from nose.tools import eq_ as eq
 import nose
 
-DEBUG=True
-DEBUG=False
+DEBUG_FAIL=True
+DEBUG_FAIL=False
+
+DEBUG_ERROR=True
+#DEBUG_ERROR=False
+
+
 DETAILEDASSERT=True
 #DETAILEDASSERT=False
 
@@ -28,12 +34,19 @@ def do_test_single(t):
 
     if NAME and name!=NAME: return
 
-    if DEBUG: print t
-
     try: 
-        g=Graph()
+        g=ConjunctiveGraph()
         if data:
-            g.load(data, format='turtle')
+            g.load(data, 
+                   publicID=URIRef(os.path.basename(data)), 
+                   format='turtle')
+
+        s=SPARQLProcessor(g)
+
+        res2=s.query(file(query[7:]).read())
+
+        if not resfile: 
+            return # done - nothing to check
 
         if resfile.endswith('ttl'):
             resg=Graph()
@@ -46,9 +59,6 @@ def do_test_single(t):
         else:
             res=Result.parse(file(resfile[7:]),format='xml') # relies on rdfextras
 
-        s=SPARQLProcessor(g)
-
-        res2=s.query(file(query[7:]).read())
 
         if not DETAILEDASSERT:
             eq(res.type, res2.type, 'Types do not match')
@@ -73,25 +83,38 @@ def do_test_single(t):
         if isinstance(e,AssertionError):
             fails[e.message]+=1
         else:
-            errors[e.message]+=1
+            # if isinstance(e, IOError): 
+            #     m=e.message+" "+e.strerror 
+            # else:
+            #     m=e.message
+            errors[e]+=1
 
-        if DEBUG and not isinstance(e,AssertionError): # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
+        if DEBUG_ERROR and not isinstance(e,AssertionError) or DEBUG_FAIL: # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
             print name
             print comment
-            print "----------------- DATA --------------------"
-            print file(data[7:]).read()
+            if data: 
+                print "----------------- DATA --------------------"
+                print ">>>", data
+                print file(data[7:]).read()
             print "----------------- Query -------------------"            
+            print ">>>", query
             print file(query[7:]).read()
-            print "----------------- Res -------------------"            
-            print file(resfile[7:]).read()
+            if resfile:
+                print "----------------- Res -------------------"            
+                print ">>>", resfile
+                print file(resfile[7:]).read()
 
-            print "----------------- Parsed ------------------"
-            pq=parseQuery(file(query[7:]).read())
-            print pq
+            try: 
+                pq=parseQuery(file(query[7:]).read())
+                print "----------------- Parsed ------------------"
+                print pq
+            except: 
+                print "(parser error)"
 
             import traceback
             traceback.print_exc()
-
+            import pdb
+            pdb.post_mortem()
             #pdb.set_trace()
             nose.tools.set_trace()
         raise
@@ -99,6 +122,11 @@ def do_test_single(t):
     
 
 def read_manifest(f): 
+
+    def _str(x): 
+        if x is not None:
+            return str(x)
+        return None
 
     g=Graph()
     g.load(f, format='turtle')
@@ -120,7 +148,7 @@ def read_manifest(f):
                 name=g.value(e, MF.name)
                 comment=g.value(e,RDFS.comment)
                 
-                yield str(name),str(comment),str(data),str(query),str(res)
+                yield _str(name),_str(comment),_str(data),_str(query),_str(res)
                 
                         
 
@@ -128,27 +156,49 @@ def test_dawg():
 
     for t in read_manifest("test/DAWG/data-r2/manifest-evaluation.ttl"):
         yield do_test_single, t
+        
+    #for t in read_manifest("test/DAWG/data-sparql11/manifest-all.ttl"):
+    #    yield do_test_single, t
+
 
 if __name__=='__main__':
 
-    import sys
+    import sys, time
+    start=time.time()
     if len(sys.argv)>1: NAME=sys.argv[1]
+    i=0
+    success=0
     for f, t in test_dawg():
+        i+=1
         try: 
             f(t)
+            success+=1
         except KeyboardInterrupt: 
             raise
-        except:
+        except AssertionError:
+            pass
+        except: 
             import traceback
             traceback.print_exc()
 
     print "\n----------------------------------------------------\n"
+
     print "Most common fails:"
     for e in fails.most_common(10):
         print e
 
     print "\n----------------------------------------------------\n"
-    print "Most common errors:"
-    for e in errors.most_common(10):
-        print e
+
+    if errors: 
+
+        print "Most common errors:"
+        for e in errors.most_common(10):
+            print e
+    else: 
+        print "(no errors!)"
+
+    f=sum(fails.values())
+    e=sum(errors.values())
+    print "\n%d tests, %d passed, %d failed, %d errors, (%d)"%(i, success, f,e, success+f+e)
+    print "Took %.2fs"%(time.time()-start)
 

@@ -38,10 +38,18 @@ the resulting CompValue
 
 # Comp('Sum')( Param('x')(Number) + '+' + Param('y')(Number) )
 
-def value(ctx, val, variables=False):
+def value(ctx, val, variables=False, errors=False):
 
     """
     utility function for evaluating something...
+
+    Variables will be looked up in the context
+    Normally, non-bound vars is an error, 
+    set variables=True to return unbound vars
+    
+    Normally, an error raises the error, 
+    set errors=True to return error 
+
     """
 
     if isinstance(val, Expr): 
@@ -59,7 +67,10 @@ def value(ctx, val, variables=False):
 
     elif isinstance(val, (BNode, Variable)):
         r=ctx[val] 
+        if isinstance(r, SPARQLError) and not errors: 
+            raise r
         if r!=None: return r
+
 
         # not bound
         if variables:
@@ -92,6 +103,11 @@ class ParamValue(object):
 
         self.tokenList=tokenList
 
+        
+    def __str__(self): 
+        return "Param(%s, %s)"%(self.name,self.tokenList)
+
+
 class Param(TokenConverter): 
     """
     A pyparsing token for labelling a part of the parse-tree
@@ -111,8 +127,8 @@ class ParamList(Param):
     """
     A shortcut for a Param with isList=True
     """
-    def __init__(self,name,expr):
-        Param.__init__(self,name,expr,True)
+    def __init__(self, name, expr):
+        Param.__init__(self, name, expr, True)
 
 class plist(list):
     """this is just a list, but we want our own type to check for"""
@@ -139,7 +155,7 @@ class CompValue(OrderedDict):
     def __repr__(self):
         return self.name+"_"+OrderedDict.__repr__(self)
 
-    def _value(self,val,variables=False): 
+    def _value(self,val, variables=False, errors=False): 
         if self.ctx!=None: 
             return value(self.ctx, val, variables)
         else: 
@@ -148,8 +164,8 @@ class CompValue(OrderedDict):
     def __getitem__(self,a): 
         return self._value(OrderedDict.__getitem__(self,a))
 
-    def get(self,a,variables=False):
-        return self._value(OrderedDict.__getitem__(self,a),variables)
+    def get(self,a,variables=False, errors=False):
+        return self._value(OrderedDict.__getitem__(self,a), variables, errors)
 
     def __getattr__(self,a):
         # Hack hack: OrderedDict relies on this
@@ -176,12 +192,8 @@ class Expr(CompValue):
         try: 
             self.ctx=ctx
             return self._evalfn(ctx)
-        except NotBoundError:
-            raise
-        except Exception,e: 
-            if DEBUG:
-                traceback.print_exc()
-            raise SPARQLError(e)
+        except SPARQLError, e: 
+            return e
         finally: 
             self.ctx=None
 

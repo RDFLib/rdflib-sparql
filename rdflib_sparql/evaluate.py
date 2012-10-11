@@ -1,9 +1,54 @@
-from rdflib import Variable, URIRef, Literal, Graph
+from rdflib import Variable, URIRef, Literal, Graph, ConjunctiveGraph
 
-from rdflib_sparql.parserutils import CompValue
+from rdflib_sparql.parserutils import CompValue, Expr
 from rdflib_sparql.operators import EBV
 from rdflib_sparql.algebra import triples
 from rdflib_sparql.sparql import QueryContext, NotBoundError, AlreadyBound, SPARQLError
+
+
+def _diff(a,b, expr): 
+    res=set()
+    for x in a: 
+        for y in b: 
+            if not x.compatible(y) or not _ebv(expr,x.merge(y)): 
+                res.add(x)
+
+    return res
+
+def _join(a,b):
+    res=set()
+    for x in a: 
+        for y in b: 
+            if x.compatible(y):
+                res.add(x.merge(y))
+    return res
+
+def _ebv(expr, ctx): 
+
+    """
+    Return true/false for the given expr
+    Either the expr is itself true/false
+    or evaluates to something, with the given ctx
+
+    an error is false
+    """
+
+    try: 
+        return EBV(expr)
+    except SPARQLError: 
+        pass 
+    if isinstance(expr, Expr):         
+        try: 
+            return EBV(expr.eval(ctx))
+        except SPARQLError: 
+            return False # filter error == False
+    return False
+
+
+def _filter(a,expr): 
+    for c in a:
+        if _ebv(expr, c):
+            yield c
 
 
 
@@ -48,18 +93,78 @@ def evalBGP(ctx, bgp):
 
 
     
+    
 def evalJoin(ctx, join): 
 
     a=set(evalPart(ctx, join.p1))
     b=set(evalPart(ctx, join.p2))
+    return _join(a,b)
+
+def evalUnion(ctx, union): 
     res=set()
-    for x in a: 
-        for y in b: 
-            if x.compatible(y):
-                res.add(x.merge(y))
+    res.update(evalPart(ctx, union.p1))
+    res.update(evalPart(ctx, union.p2))
     return res
 
+def evalLeftJoin(ctx, join): 
 
+    a=set(evalPart(ctx, join.p1))
+    b=set(evalPart(ctx, join.p2))
+    res=set()
+    res.update(_filter(_join(a,b), join.expr))
+    res.update(_diff(a,b,join.expr))
+
+    return res
+
+def evalFilter(ctx, part): 
+    return _filter(evalPart(ctx, part.p), part.expr)
+
+def evalGraph(ctx, part): 
+    ctx=ctx.clone()
+    graph=ctx[ctx.absolutize(part.term)]
+    if graph is None:
+        for graph in ctx.graph.contexts(): 
+            ctx.pushGraph(graph)
+            ctx.push()
+            ctx[part.term]=graph.identifier
+            for x in evalPart(ctx, part.p):
+                yield x
+            ctx.pop()
+            ctx.popGraph()
+    else: 
+        if not isinstance(ctx.graph, ConjunctiveGraph): 
+            raise Exception("Non-conjunctive-graph doesn't know about graphs!")
+        ctx.pushGraph(ctx.graph.get_context(graph))
+        for x in evalPart(ctx, part.p):
+            yield x
+        
+def evalMultiset(ctx, part): 
+    return evalPart(ctx, part.p)
+
+def evalPart(ctx, part):
+    if part.name=='BGP':
+        return evalBGP(ctx,part.triples)
+    elif part.name=='Filter': 
+        return evalFilter(ctx,part)
+    elif part.name=='Join': 
+        return evalJoin(ctx, part)
+    elif part.name=='LeftJoin':
+        return evalLeftJoin(ctx, part)
+    elif part.name=='Minus':
+        raise Exception('Minus NotYetImplemented!')    
+    elif part.name=='Graph':
+        return evalGraph(ctx, part)
+    elif part.name=='Union':
+        return evalUnion(ctx, part)
+    elif part.name=='ToMultiSet':
+        return evalMultiset(ctx,part)
+    elif part.name=='Extend':
+        raise Exception('Extend NotYetImplemented!')
+    else: 
+        #import pdb ; pdb.set_trace()
+        raise Exception('I dont know: %s'%part.name)
+        
+        
 
 def evalQuery(graph, query, initBindings, initNs):
     ctx=QueryContext(graph)
@@ -103,41 +208,7 @@ def evalQuery(graph, query, initBindings, initNs):
             raise Exception('I do not know this type of query: %s'%main.name)
 
     raise Exception('Urk!')
-
-def evalFilter(ctx, part): 
-    for c in evalPart(ctx, part.p):
-        try: 
-            ctx.push(c)            
-            if EBV(part.expr.eval(ctx)):
-                yield c
-        except: 
-            pass # filter failed
-        finally: 
-            ctx.pop()
-
-
-def evalPart(ctx, part):
-    if part.name=='BGP':
-        return evalBGP(ctx,part.triples)
-    elif part.name=='Filter': 
-        return evalFilter(ctx,part)
-    elif part.name=='Join': 
-        return evalJoin(ctx, part)
-    elif part.name=='LeftJoin':
-        raise Exception('LeftJoin NotYetImplemented!')
-    elif part.name=='Minus':
-        raise Exception('Minus NotYetImplemented!')    
-    elif part.name=='Graph':
-        raise Exception('Graph NotYetImplemented!')
-    elif part.name=='Union':
-        raise Exception('Union NotYetImplemented!')
-    elif part.name=='Extend':
-        raise Exception('Extend NotYetImplemented!')
-    else: 
-        #import pdb ; pdb.set_trace()
-        raise Exception('I dont know: %s'%part.name)
-
-   
+ 
 
 def evalAskQuery(ctx, query):            
 

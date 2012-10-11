@@ -37,3 +37,8 @@ Thu Oct 11 08:11:10 CEST 2012
 # and/filter fix
 FAILED (errors=64, failures=94)
 
+Thu Oct 11 16:29:40 CEST 2012
+240 tests, 81 passed, 159 failed, 0 errors, (240)
+
+# Triples-list fix
+240 tests, 126 passed, 114 failed, 0 errors, (240)

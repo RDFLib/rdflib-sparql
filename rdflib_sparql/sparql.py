@@ -20,24 +20,48 @@ class AlreadyBound(SPARQLError):
     def __init__(self): 
         SPARQLError.__init__(self)
 
-class Bindings(dict):
+class SPARQLTypeError(SPARQLError): 
+    def __init__(self, msg): 
+        SPARQLError.__init__(self, msg)
+
+class Bindings(collections.MutableMapping):
     def __init__(self, outer=None, d=[]): 
-        dict.__init__(self, d)
+        self._d=dict(d)
         self.outer=outer
 
     def __getitem__(self, key):
         try:
-            return dict.__getitem__(self, key)
-        except: 
+            return self._d[key]
+        except KeyError: 
             if not self.outer: raise
             return self.outer[key]
-        
-    def iteritems(self):
+
+    def __contains__(self, key): 
+        try: 
+            self[key]
+            return True
+        except KeyError: 
+            return False
+
+    def __setitem__(self, key, value): 
+        self._d[key]=value
+    
+    def __delitem__(self, key): 
+        raise Exception("DelItem is not implemented!")
+    
+    def __len__(self): 
+        i=0
+        for x in self: i+=1
+        return i
+    
+    def __iter__(self): 
         d=self
         while d!=None:
-            for i in dict.iteritems(d):
+            for i in dict.__iter__(d._d):
                 yield i
             d=d.outer
+
+        
 
 class FrozenBindings(collections.Mapping):
     """
@@ -47,7 +71,8 @@ class FrozenBindings(collections.Mapping):
 
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, ctx, *args, **kwargs):
+        self.ctx=ctx
         self._d = dict(*args, **kwargs)
         self._hash = None
 
@@ -74,7 +99,7 @@ class FrozenBindings(collections.Mapping):
         return self._hash
 
     def vars(self, vars):
-        return FrozenBindings(x for x in self.iteritems() if x[0] in vars)
+        return FrozenBindings(self.ctx, (x for x in self.iteritems() if x[0] in vars))
     
     def compatible(self, other): 
         for k in self: 
@@ -86,24 +111,44 @@ class FrozenBindings(collections.Mapping):
         return True
     
     def merge(self, other): 
-        res=FrozenBindings(itertools.chain(self.iteritems(), other.iteritems()))
+        res=FrozenBindings(self.ctx, itertools.chain(self.iteritems(), other.iteritems()))
 
         return res
     
-    def str(self):
+    def __str__(self):
         return self._d.str()
+
+    def __repr__(self): 
+        return repr(self._d)
+
+    def absolutize(self, iri): 
+        return self.ctx.absolutize(iri)
 
 class QueryContext(object): 
 
     def __init__(self, graph=None): 
         self.bindings=Bindings()
-        self.graph=graph
+        self._graph=[graph]
         self.namespace_manager=NamespaceManager(Graph())  # ns man needs a store
         self.base=None
         self.vars=set()
 
         self.bnodes=collections.defaultdict(BNode)
 
+    def clone(self): 
+        r=QueryContext()
+        r.bindings.update(self.bindings)
+        r._graph=list(self._graph)
+        r.namespace_manager=self.namespace_manager
+        r.base=self.base
+        r.vars=self.vars
+        r.bnodes=self.bnodes
+        return r
+
+    def _get_graph(self): 
+        return self._graph[-1]
+
+    graph=property(_get_graph, doc="current graph")
 
     def __getitem__(self, key):
         # in SPARQL BNodes are just labels
@@ -119,9 +164,9 @@ class QueryContext(object):
         Return a static copy of the current variable bindings as dict
         """
         if vars: 
-            return FrozenBindings((k,v) for k,v in self.bindings.iteritems() if k in vars)
+            return FrozenBindings(self, ((k,v) for k,v in self.bindings.iteritems() if k in vars))
         else:
-            return FrozenBindings(self.bindings.iteritems())
+            return FrozenBindings(self, self.bindings.iteritems())
 
     def __setitem__(self, key, value): 
         if key in self.bindings and self.bindings[key]!=value:
@@ -129,8 +174,14 @@ class QueryContext(object):
             
         self.bindings[key]=value
 
-    def push(self, d=[]):
-        self.bindings=Bindings(self.bindings,d)
+    def pushGraph(self, graph): 
+        self._graph.append(graph)
+
+    def popGraph(self): 
+        self._graph.pop()
+
+    def push(self):
+        self.bindings=Bindings(self.bindings)
         
     def pop(self):
         self.bindings=self.bindings.outer
