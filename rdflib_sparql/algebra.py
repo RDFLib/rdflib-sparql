@@ -54,11 +54,11 @@ def translateGroupGraphPattern(graphPattern):
     http://www.w3.org/TR/sparql11-query/#convertGraphPattern
     """
 
-    filters=findFilters(graphPattern)
+    filters=findFilters(graphPattern.part)
     filters=simplify(filters) # TODO move me!
 
     g=[]
-    for p in graphPattern: 
+    for p in graphPattern.part: 
         if p.name=='TriplesBlock': 
             # merge adjacent TripleBlocks
             if not (g and g[-1].name=='BGP'): 
@@ -74,7 +74,7 @@ def translateGroupGraphPattern(graphPattern):
         if p.name=='OptionalGraphPattern':
             A=translateGroupGraphPattern(p.graph)
             if A.name=='Filter':
-                G=CompValue('LeftJoin', p1=G, p2=A.A, expr=A.F)
+                G=CompValue('LeftJoin', p1=G, p2=A.p, expr=A.expr)
             else: 
                 G=CompValue('LeftJoin', p1=G, p2=A, expr=True)
         elif p.name=='MinusGraphPattern': 
@@ -94,7 +94,7 @@ def translateGroupGraphPattern(graphPattern):
         
             
     if filters: 
-        G=CompValue('Filter', expr=filters, G=G)
+        G=CompValue('Filter', expr=filters, p=G)
         
     return G
     
@@ -102,7 +102,7 @@ def translateGroupGraphPattern(graphPattern):
 def translate(q): 
         
     # all query types have a where part
-    q.where["part"]=translateGroupGraphPattern(q.where.part)
+    q.where["part"]=translateGroupGraphPattern(q.where)
 
     if q.having: 
         q.where["part"]=CompValue('Filter', expr=and_(q.having.condition), G=q.where["part"])
@@ -111,10 +111,14 @@ def translate(q):
 
     
 def translateQuery(q): 
-    if len(q)>2:
-        return q[0],CompValue('Join', p1=translate(q[1]), p2=ToMultiSet(q[2]))
-    else: 
-        return q[0],translate(q[1])
+    try: 
+        if len(q)>2:
+            return q[0],CompValue('Join', p1=translate(q[1]), p2=ToMultiSet(q[2]))
+        else: 
+            return q[0],translate(q[1])
+    except:
+        import pdb
+        pdb.post_mortem()
 
 def pprintAlgebra(q): 
     def pp(p, ind="    "):

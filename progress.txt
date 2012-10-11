@@ -26,4 +26,14 @@ Sun Oct  7 10:48:50 CEST 2012
 # more builtin functions, fixed bnode property-list triples
 FAILED (errors=49, failures=98)
 
+Wed Oct 10 22:18:18 CEST 2012
+# after convertin algebra
+FAILED (errors=151, failures=21)
+
+# stupid filter exception=>error
+FAILED (errors=66, failures=93)
+
+Thu Oct 11 08:11:10 CEST 2012
+# and/filter fix
+FAILED (errors=64, failures=94)
 

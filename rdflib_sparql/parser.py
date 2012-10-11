@@ -871,7 +871,7 @@ WhereClause = Optional(Keyword('WHERE')) + Param('where', GroupGraphPattern )
 SubSelect = Comp ('SubSelect', SelectClause + WhereClause + SolutionModifier + ValuesClause )
 
 # [53] GroupGraphPattern ::= '{' ( SubSelect | GroupGraphPatternSub ) '}'
-GroupGraphPattern << Suppress('{') + ( SubSelect | GroupGraphPatternSub ) + Suppress('}') 
+GroupGraphPattern << ( Suppress('{') + ( SubSelect | GroupGraphPatternSub ) + Suppress('}') )
 
 # [7] SelectQuery ::= SelectClause DatasetClause* WhereClause SolutionModifier
 SelectQuery = Comp('SelectQuery', SelectClause + Param('from', ZeroOrMore(DatasetClause) ) + WhereClause + SolutionModifier)

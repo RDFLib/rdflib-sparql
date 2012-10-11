@@ -2,20 +2,20 @@ from rdflib import Variable, URIRef, Literal, Graph
 
 from rdflib_sparql.parserutils import CompValue
 from rdflib_sparql.operators import EBV
+from rdflib_sparql.algebra import triples
 from rdflib_sparql.sparql import QueryContext, NotBoundError, AlreadyBound, SPARQLError
 
 
 
-def matchBGP(bgp, ctx): 
+def evalBGP(ctx, bgp): 
     
     if not bgp:
-        yield ctx
+        yield ctx.solution()
         return 
     
     s,p,o=[ctx.absolutize(x) for x in bgp[0]]
 
     #import nose.tools ;nose.tools.set_trace()
-    
 
     _s=ctx[s]
     _p=ctx[p]
@@ -38,7 +38,7 @@ def matchBGP(bgp, ctx):
             except AlreadyBound: 
                 continue
 
-            for _ctx in matchBGP(bgp[1:],ctx): 
+            for _ctx in evalBGP(ctx,bgp[1:]): 
                 yield _ctx
 
         finally:
@@ -48,6 +48,16 @@ def matchBGP(bgp, ctx):
 
 
     
+def evalJoin(ctx, join): 
+
+    a=set(evalPart(ctx, join.p1))
+    b=set(evalPart(ctx, join.p2))
+    res=set()
+    for x in a: 
+        for y in b: 
+            if x.compatible(y):
+                res.add(x.merge(y))
+    return res
 
 
 
@@ -94,45 +104,40 @@ def evalQuery(graph, query, initBindings, initNs):
 
     raise Exception('Urk!')
 
-def evalPart(ctx, part):
-    if part.name=='TriplesBlock':
-        for c in matchBGP(triples(part.triples), ctx):
-            yield c
-    elif part.name=='Filter': 
-        yield ctx # handled outside
-    elif part.name=='OptionalGraphPattern':
-        solutions=False
-        for c in evalParts(ctx,part.graph.part):
-            solutions=True
-            yield c
+def evalFilter(ctx, part): 
+    for c in evalPart(ctx, part.p):
+        try: 
+            ctx.push(c)            
+            if EBV(part.expr.eval(ctx)):
+                yield c
+        except: 
+            pass # filter failed
+        finally: 
+            ctx.pop()
 
-        if not solutions: yield ctx # optional!            
-    elif part.name=='GroupOrUnionGraphPattern':
-        pass
+
+def evalPart(ctx, part):
+    if part.name=='BGP':
+        return evalBGP(ctx,part.triples)
+    elif part.name=='Filter': 
+        return evalFilter(ctx,part)
+    elif part.name=='Join': 
+        return evalJoin(ctx, part)
+    elif part.name=='LeftJoin':
+        raise Exception('LeftJoin NotYetImplemented!')
+    elif part.name=='Minus':
+        raise Exception('Minus NotYetImplemented!')    
+    elif part.name=='Graph':
+        raise Exception('Graph NotYetImplemented!')
+    elif part.name=='Union':
+        raise Exception('Union NotYetImplemented!')
+    elif part.name=='Extend':
+        raise Exception('Extend NotYetImplemented!')
     else: 
         #import pdb ; pdb.set_trace()
         raise Exception('I dont know: %s'%part.name)
 
-def evalParts(ctx, parts):
-
-
-    if not parts:
-        yield ctx
-        return
-
-    for c in evalPart(ctx, parts[0]): 
-        for s in evalParts(c, parts[1:]):
-            try: 
-                if filters and not EBV(filters.eval(s)):
-                    print "Filter fail",s
-                else: 
-                    yield s
-            except SPARQLError, e:
-                print "Filter ERRROR fail",e,s
-
-            except NotBoundError:
-                print "Filter NotBound fail",s
-    
+   
 
 def evalAskQuery(ctx, query):            
 
@@ -143,7 +148,7 @@ def evalAskQuery(ctx, query):
 
     answer=False
 
-    for c in evalParts(ctx, query.where.part):
+    for c in evalPart(ctx, query.where.part):
         answer=True
         break
         
@@ -175,15 +180,15 @@ def evalSelectQuery(ctx, query):
     distinctSet=set()
 
     i=0
-    for c in evalParts(ctx, query.where.part):
+    for c in evalPart(ctx, query.where.part):
 
         if i>=offset:
-            solution=c.solution(selectVars)
+            solution=c.vars(selectVars) if selectVars else c
             if distinct:                
-                solutionTuple=tuple(sorted(solution.iteritems())) # dicts are not hashable
-                if solutionTuple not in distinctSet:
+                
+                if solution not in distinctSet:
                     bindings.append(solution)
-                    distinctSet.add(solutionTuple)
+                    distinctSet.add(solution)
             else: 
                 bindings.append(solution)
         i+=1
@@ -222,7 +227,7 @@ def evalConstructQuery(ctx, query):
     graph=Graph()
 
     i=0
-    for c in evalParts(ctx, query.where.part):
+    for c in evalPart(ctx, query.where.part):
 
         if i>=offset:
 

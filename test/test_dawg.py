@@ -11,7 +11,7 @@ from nose.tools import eq_ as eq
 import nose
 
 DEBUG=True
-#DEBUG=False
+DEBUG=False
 DETAILEDASSERT=True
 #DETAILEDASSERT=False
 
@@ -21,6 +21,7 @@ QT=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-query#')
 NAME=None
 
 fails=collections.Counter()
+errors=collections.Counter()
 
 def do_test_single(t):
     name,comment,data,query,resfile=t
@@ -69,7 +70,10 @@ def do_test_single(t):
 
     except Exception,e:
 
-        fails[e.message]+=1
+        if isinstance(e,AssertionError):
+            fails[e.message]+=1
+        else:
+            errors[e.message]+=1
 
         if DEBUG and not isinstance(e,AssertionError): # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
             print name
@@ -84,7 +88,10 @@ def do_test_single(t):
             print "----------------- Parsed ------------------"
             pq=parseQuery(file(query[7:]).read())
             print pq
-            #import pdb
+
+            import traceback
+            traceback.print_exc()
+
             #pdb.set_trace()
             nose.tools.set_trace()
         raise
@@ -136,5 +143,12 @@ if __name__=='__main__':
             traceback.print_exc()
 
     print "\n----------------------------------------------------\n"
-    for e in fails.most_common(20):
+    print "Most common fails:"
+    for e in fails.most_common(10):
         print e
+
+    print "\n----------------------------------------------------\n"
+    print "Most common errors:"
+    for e in errors.most_common(10):
+        print e
+

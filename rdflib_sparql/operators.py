@@ -296,9 +296,8 @@ def and_(*args):
     if len(args)==1: 
         return args[0]
     
-    a={ 'expr': args[0], 'other': list(args[1:]) }
-
-    return Expr('ConditionalAndExpression', a, ConditionalAndExpression)
+    return Expr('ConditionalAndExpression', ConditionalAndExpression, 
+                expr=args[0], other=list(args[1:]))
     
 
 def simplify(expr): 
