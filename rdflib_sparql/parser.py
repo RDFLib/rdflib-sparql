@@ -25,12 +25,7 @@ def setLanguage(terms):
     return rdflib.Literal(terms[0], lang=terms[1])
 
 def setDataType(terms):
-    try: 
-        return rdflib.Literal(terms[0], datatype=terms[1])
-    except: 
-        if DEBUG: 
-            traceback.print_exc()
-        raise
+    return rdflib.Literal(terms[0], datatype=terms[1])
 
 def expandTriples(terms):
     
@@ -227,24 +222,24 @@ DOUBLE_NEGATIVE.setParseAction(lambda x: neg(x[0]))
 # [158] STRING_LITERAL_LONG1 ::= "'''" ( ( "'" | "''" )? ( [^'\] | ECHAR ) )* "'''"
 #STRING_LITERAL_LONG1 = Literal("'''") + ( Optional( Literal("'") | "''" ) + ZeroOrMore( ~ Literal("'\\") | ECHAR ) ) + "'''"
 STRING_LITERAL_LONG1 = Regex(ur"'''((?:'|'')?(?:[^'\\]|\\['ntbrf\\]))*'''")
-STRING_LITERAL_LONG1.setParseAction(lambda x: rdflib.Literal(x[0][3:-3]))
+STRING_LITERAL_LONG1.setParseAction(lambda x: rdflib.Literal(x[0][3:-3].decode('string-escape')))
 
 # [159] STRING_LITERAL_LONG2 ::= '"""' ( ( '"' | '""' )? ( [^"\] | ECHAR ) )* '"""'
 #STRING_LITERAL_LONG2 = Literal('"""') + ( Optional( Literal('"') | '""' ) + ZeroOrMore( ~ Literal('"\\') | ECHAR ) ) +  '"""'
 STRING_LITERAL_LONG2 = Regex(ur'"""(?:(?:"|"")?(?:[^"\\]|\\["ntbrf\\]))*"""')
-STRING_LITERAL_LONG2.setParseAction(lambda x: rdflib.Literal(x[0][3:-3]))
+STRING_LITERAL_LONG2.setParseAction(lambda x: rdflib.Literal(x[0][3:-3].decode('string-escape')))
 
 # [156] STRING_LITERAL1 ::= "'" ( ([^#x27#x5C#xA#xD]) | ECHAR )* "'"
 #STRING_LITERAL1 = Literal("'") + ZeroOrMore( Regex(u'[^\u0027\u005C\u000A\u000D]',flags=re.U) | ECHAR ) + "'"
 
-STRING_LITERAL1 = Regex(ur"'(?:[^\u0027\u000A\u000D\\]|\\['ntbrf])*'(?!')", flags=re.U)
-STRING_LITERAL1.setParseAction(lambda x: rdflib.Literal(x[0][1:-1]))
+STRING_LITERAL1 = Regex(ur"'(?:[^\u0027\u000A\u000D\\]|\\['ntbrf\\])*'(?!')", flags=re.U)
+STRING_LITERAL1.setParseAction(lambda x: rdflib.Literal(x[0][1:-1].decode('string-escape')))
 
 # [157] STRING_LITERAL2 ::= '"' ( ([^#x22#x5C#xA#xD]) | ECHAR )* '"'
 #STRING_LITERAL2 = Literal('"') + ZeroOrMore ( Regex(u'[^\u0022\u005C\u000A\u000D]',flags=re.U) | ECHAR ) + '"'
 
 STRING_LITERAL2 = Regex(ur'"(?:[^\u0022\u000A\u000D\\]|\\["ntbrf\\])*"(?!")', flags=re.U)
-STRING_LITERAL2.setParseAction(lambda x: rdflib.Literal(x[0][1:-1]))
+STRING_LITERAL2.setParseAction(lambda x: rdflib.Literal(x[0][1:-1].decode('string-escape')))
 
 # [161] NIL ::= '(' WS* ')'
 NIL = Literal('(') + ')'
@@ -621,11 +616,11 @@ BuiltInCall = Aggregate \
     | Comp('Builtin_STRLANG', Keyword('STRLANG') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
     | Comp('Builtin_STRDT', Keyword('STRDT') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
     | Comp('Builtin_sameTerm', Keyword('sameTerm') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_sameTerm) \
-    | Comp('Builtin_isIRI', Keyword('isIRI') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_isURI', Keyword('isURI') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_isBLANK', Keyword('isBLANK') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_isLITERAL', Keyword('isLITERAL') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_isNUMERIC', Keyword('isNUMERIC') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_isIRI', Keyword('isIRI') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_isIRI) \
+    | Comp('Builtin_isURI', Keyword('isURI') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_isIRI) \
+    | Comp('Builtin_isBLANK', Keyword('isBLANK') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_isBLANK) \
+    | Comp('Builtin_isLITERAL', Keyword('isLITERAL') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_isLITERAL) \
+    | Comp('Builtin_isNUMERIC', Keyword('isNUMERIC') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_isNUMERIC) \
     | RegexExpression \
     | ExistsFunc \
     | NotExistsFunc

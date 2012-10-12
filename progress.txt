@@ -42,3 +42,6 @@ Thu Oct 11 16:29:40 CEST 2012
 
 # Triples-list fix
 240 tests, 126 passed, 114 failed, 0 errors, (240)
+
+# More builtins - optional fix
+240 tests, 150 passed, 90 failed, 0 errors, (62.00% success)

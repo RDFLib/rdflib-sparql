@@ -4,6 +4,7 @@ import os.path
 from rdflib import ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef
 from rdflib.query import Result
 
+from rdflib_sparql.algebra import pprintAlgebra, translateQuery
 from rdflib_sparql.parser import parseQuery
 from rdflib_sparql.processor import SPARQLProcessor
 from rdflib_sparql.results.rdfresults import RDFResultParser
@@ -29,10 +30,11 @@ NAME=None
 fails=collections.Counter()
 errors=collections.Counter()
 
-def do_test_single(t):
-    name,comment,data,query,resfile=t
+failed_tests=[]
+error_tests=[]
 
-    if NAME and name!=NAME: return
+def do_test_single(t):
+    uri, name,comment,data,query,resfile=t
 
     try: 
         g=ConjunctiveGraph()
@@ -81,12 +83,14 @@ def do_test_single(t):
     except Exception,e:
 
         if isinstance(e,AssertionError):
+            failed_tests.append(uri)
             fails[e.message]+=1
         else:
             # if isinstance(e, IOError): 
             #     m=e.message+" "+e.strerror 
             # else:
             #     m=e.message
+            error_tests.append(uri)
             errors[e]+=1
 
         if DEBUG_ERROR and not isinstance(e,AssertionError) or DEBUG_FAIL: # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
@@ -107,7 +111,7 @@ def do_test_single(t):
             try: 
                 pq=parseQuery(file(query[7:]).read())
                 print "----------------- Parsed ------------------"
-                print pq
+                pprintAlgebra(translateQuery(pq))
             except: 
                 print "(parser error)"
 
@@ -132,7 +136,7 @@ def read_manifest(f):
     g.load(f, format='turtle')
 
     for m in g.subjects(RDF.type, MF.Manifest):
-        
+
         for col in g.objects(m, MF.include):
             for i in g.items(col):
                 for x in read_manifest(i):
@@ -144,11 +148,12 @@ def read_manifest(f):
                 a=g.value(e, MF.action)
                 query=g.value(a, QT.query)
                 data=g.value(a, QT.data)
+
                 res=g.value(e, MF.result)
                 name=g.value(e, MF.name)
                 comment=g.value(e,RDFS.comment)
                 
-                yield _str(name),_str(comment),_str(data),_str(query),_str(res)
+                yield e, _str(name),_str(comment),_str(data),_str(query),_str(res)
                 
                         
 
@@ -165,10 +170,13 @@ if __name__=='__main__':
 
     import sys, time
     start=time.time()
-    if len(sys.argv)>1: NAME=sys.argv[1]
+    if len(sys.argv)>1: 
+        NAME=sys.argv[1]
+        DEBUG_FAIL=True
     i=0
     success=0
     for f, t in test_dawg():
+        if NAME and str(t[0])!=NAME: continue
         i+=1
         try: 
             f(t)
@@ -181,11 +189,23 @@ if __name__=='__main__':
             import traceback
             traceback.print_exc()
 
+
+    print "\n----------------------------------------------------\n"
+    print "Failed tests:"
+    for f in failed_tests: 
+        print f
+
+    print "\n----------------------------------------------------\n"
+    print "Error tests:"
+    for f in error_tests:
+        print f
+
     print "\n----------------------------------------------------\n"
 
     print "Most common fails:"
     for e in fails.most_common(10):
-        print e
+        e=str(e)
+        print e[:450]+(e[450:] and "...")
 
     print "\n----------------------------------------------------\n"
 
@@ -199,6 +219,10 @@ if __name__=='__main__':
 
     f=sum(fails.values())
     e=sum(errors.values())
-    print "\n%d tests, %d passed, %d failed, %d errors, (%d)"%(i, success, f,e, success+f+e)
+
+    if success+f+e!=i: 
+        print "(Something is wrong, %d!=%d)"%(success+f+e, i)
+    
+    print "\n%d tests, %d passed, %d failed, %d errors, (%.2f%% success)"%(i, success, f,e, 100*success/i)
     print "Took %.2fs"%(time.time()-start)
 

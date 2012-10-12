@@ -7,7 +7,7 @@ from decimal import Decimal
 import operator as pyop # python operators
 
 from rdflib_sparql.parserutils import CompValue, Expr
-from rdflib import URIRef, BNode, Variable, Literal, XSD
+from rdflib import URIRef, BNode, Variable, Literal, XSD, RDF
 from rdflib.term import Node
 
 from pyparsing import ParseResults
@@ -21,6 +21,9 @@ They get bound as instances-methods to the CompValue objects from parserutils
 using setEvalFn
 
 """
+
+# closed namespace, langString isn't in it
+RDF_langString=URIRef(RDF.uri+"langString")
 
 
 def Builtin_IRI(expr, ctx): 
@@ -36,6 +39,24 @@ def Builtin_IRI(expr, ctx):
         return URIRef(a)
 
     return SPARQLError('IRI function only accepts URIRefs or Literals/Strings!')
+
+def Builtin_isBLANK(expr, ctx):
+    return Literal( isinstance(expr.arg, BNode) ) 
+
+def Builtin_isLITERAL(expr, ctx):
+    return Literal( isinstance(expr.arg, Literal) ) 
+
+def Builtin_isIRI(expr, ctx):
+    return Literal( isinstance(expr.arg, URIRef) ) 
+
+
+def Builtin_isNUMERIC(expr, ctx):
+    try: 
+        numeric(expr.arg)
+        return Literal(True)
+    except:
+        return Literal(False)
+
 
 
 def Builtin_BNODE(expr, ctx): 
@@ -105,6 +126,12 @@ def Builtin_REGEX(expr, ctx):
     pattern = expr.pattern
     flags = expr.flags
 
+    if not isinstance(text, Literal): 
+        raise SPARQLTypeError('RegEx works only on Literals or strings')
+    if not isinstance(pattern, Literal): 
+        raise SPARQLTypeError('RegEx works only on Literals or strings')
+        
+
     if flags:
         cFlag = 0
 
@@ -113,10 +140,10 @@ def Builtin_REGEX(expr, ctx):
         flagMap=dict([('i', re.IGNORECASE), ('s', re.DOTALL), ('m', re.MULTILINE)])
         cFlag=reduce(pyop.or_, [flagMap.get(f,0) for f in flags])
 
-        return Literal(bool(re.compile(pattern,cFlag).search(text)))
+        return Literal(bool(re.compile(unicode(pattern),cFlag).search(text)))
 
     else:
-        return Literal(bool(re.compile(pattern).search(text)))
+        return Literal(bool(re.compile(unicode(pattern)).search(text)))
 
 def Builtin_STRLEN(e, ctx):
     l=e.arg
@@ -128,7 +155,7 @@ def Builtin_STR(e, ctx):
     arg=e.arg
     #if not isinstance(l,Literal): raise SPARQLError('Can only get length of literal: %s'%l)
     
-    return unicode(arg) # hmm
+    return Literal(unicode(arg)) # plain literal
 
 
 def Builtin_LCASE(e, ctx):    
@@ -156,15 +183,24 @@ def Builtin_UCASE(e, ctx):
 
 
 def Builtin_LANG(e,ctx):
+
+    """
+    http://www.w3.org/TR/sparql11-query/#func-lang
+
+    Returns the language tag of ltrl, if it has one. It returns "" if ltrl has no language tag. Note that the RDF data model does not include literals with an empty language tag.
+    """
+
     l=e.arg
     if not isinstance(l,Literal): raise SPARQLError('Can only get language of literal: %s'%l)
-    
-    return Literal(l.language)
+    return Literal(l.language or "")
 
 def Builtin_DATATYPE(e,ctx):
     l=e.arg
     if not isinstance(l,Literal): raise SPARQLError('Can only get datatype of literal: %s'%l)
-    
+    if l.language: 
+        return RDF_langString
+    if not l.datatype and not l.language: 
+        return XSD.string
     return l.datatype
 
 def Builtin_sameTerm(e,ctx):
@@ -256,19 +292,36 @@ def RelationalExpression(e, ctx):
 
     #import pdb ; pdb.set_trace()
 
+    if type(expr)!=type(other): raise SPARQLError('Comparing different types of RDF terms is an error!')
+
     if not op in ('=', '!='): 
-        if not isinstance(expr, Literal): raise SPARQLError("Compare non-literals is an error: %s"%expr )
-        if not isinstance(other, Literal): raise SPARQLError("Compare non-literals is an error: %s"%other )
+        if not isinstance(expr, Literal): raise SPARQLError("Compare other than =, != of non-literals is an error: %s"%expr )
+        if not isinstance(other, Literal): raise SPARQLError("Compare other than =, != of non-literals is an error: %s"%other )
     else:
         if not isinstance(expr, Node): raise SPARQLError('I cannot compare this non-node: %s'%expr)
         if not isinstance(other, Node): raise SPARQLError('I cannot compare this non-node: %s'%other)
 
-        if type(expr)!=type(other): raise SPARQLError('Comparing different types of RDF terms is an error!')
+    if isinstance(expr, Literal) and isinstance(other, Literal): 
 
-        if isinstance(expr, Literal) and isinstance(other, Literal): 
-            if unicode(expr)!=unicode(other):
-                if expr.datatype and expr.datatype not in XSD_DTs: raise SPARQLError('I do not know how to compare literals with datatype: %s'%expr.datatype)
-                if other.datatype and other.datatype not in XSD_DTs: raise SPARQLError('I do not know how to compare literals with datatype: %s'%other.datatype)
+        # if XSD dt we can convert and do many things
+        if expr.datatype in XSD_DTs and other.datatype in XSD_DTs: 
+            pass
+        else:             
+            # if non-XSD DT, they must be equal 
+            if expr.datatype!=other.datatype: 
+                raise SPARQLError('Cannot compare literals with non-matching non-XSD datatypes')
+            # and for non-XSD DTs we can only do =,!= 
+            if op not in ('=', '!='): 
+                raise SPARQLError('Can only do =,!= comparisons of non-XSD Literals')
+            # lang-tag has to be case insensitive equal 
+            if (expr.language or "").lower()!=(other.language or "").lower():
+                raise SPARQLError('Cannot compare literals with non-matching language tags')
+
+        # # finally compare lexical forms
+
+        # if unicode(expr)!=unicode(other):
+        #     if expr.datatype and expr.datatype not in XSD_DTs: raise SPARQLError('I do not know how to compare literals with datatype: %s'%expr.datatype)
+        #     if other.datatype and other.datatype not in XSD_DTs: raise SPARQLError('I do not know how to compare literals with datatype: %s'%other.datatype)
 
     return Literal(ops[op](expr, other))
     

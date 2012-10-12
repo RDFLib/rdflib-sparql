@@ -9,9 +9,8 @@ from rdflib_sparql.sparql import QueryContext, NotBoundError, AlreadyBound, SPAR
 def _diff(a,b, expr): 
     res=set()
     for x in a: 
-        for y in b: 
-            if not x.compatible(y) or not _ebv(expr,x.merge(y)): 
-                res.add(x)
+        if all(not x.compatible(y) or not _ebv(expr,x.merge(y)) for y in b): 
+            res.add(x)
 
     return res
 
@@ -42,6 +41,8 @@ def _ebv(expr, ctx):
             return EBV(expr.eval(ctx))
         except SPARQLError: 
             return False # filter error == False
+    elif isinstance(expr, CompValue): 
+        raise Exception("Weird - filter got a CompValue without evalfn! %r"%expr)
     return False
 
 
@@ -308,10 +309,10 @@ def evalConstructQuery(ctx, query):
                 _s=ctx[s]
                 _p=ctx[p]
                 _o=ctx[o]
-                
-                if not isinstance(_s, Variable) and \
-                        not isinstance(_p, Variable) and \
-                        not isinstance(_o, Variable):
+
+                if _s is not None and \
+                        _p is not None and \
+                        _o is not None:
                 
                     graph.add((_s,_p,_o))
 
