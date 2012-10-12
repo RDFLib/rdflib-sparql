@@ -838,10 +838,10 @@ HavingClause = Comp('HavingClause', Keyword('HAVING') + OneOrMore(ParamList('con
 
 # [24] OrderCondition ::= ( ( 'ASC' | 'DESC' ) BrackettedExpression )
 # | ( Constraint | Var )
-OrderCondition = ( ParamList('order', Keyword('ASC') | Keyword('DESC') | Empty().setParseAction(lambda : 'ASC') ) + ParamList('expr', BrackettedExpression) ) | ParamList('order', Empty().setParseAction(lambda : 'ASC')) + ParamList('expr', Constraint | Var )
+OrderCondition = Comp('OrderCondition',  Param('order', Keyword('ASC') | Keyword('DESC') ) + Param('expr', BrackettedExpression)  | Param('expr', Constraint | Var ) )
 
 # [23] OrderClause ::= 'ORDER' 'BY' OneOrMore(OrderCondition)
-OrderClause =  Comp('OrderClause', Keyword('ORDER') + Keyword('BY') + Group ( OneOrMore( OrderCondition) ))
+OrderClause =  Comp('OrderClause', Keyword('ORDER') + Keyword('BY') + OneOrMore( ParamList('condition', OrderCondition ) ) ) 
 
 # [26] LimitClause ::= 'LIMIT' INTEGER
 LimitClause = Keyword('LIMIT') + Param('limit', INTEGER)
@@ -870,7 +870,6 @@ GroupGraphPattern << ( Suppress('{') + ( SubSelect | GroupGraphPatternSub ) + Su
 
 # [7] SelectQuery ::= SelectClause DatasetClause* WhereClause SolutionModifier
 SelectQuery = Comp('SelectQuery', SelectClause + Param('from', ZeroOrMore(DatasetClause) ) + WhereClause + SolutionModifier)
-#SelectQuery.setParseAction(lambda x: components.SelectQuery(*x))
 
 # [10] ConstructQuery ::= 'CONSTRUCT' ( ConstructTemplate DatasetClause* WhereClause SolutionModifier | DatasetClause* 'WHERE' '{' TriplesTemplate? '}' SolutionModifier )
 ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( ConstructTemplate  + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier ) )

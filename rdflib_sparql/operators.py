@@ -165,11 +165,18 @@ def Builtin_LCASE(e, ctx):
     return Literal(l.tolower())
 
 def Builtin_LANGMATCHES(e,ctx):
+    """
+    http://www.w3.org/TR/sparql11-query/#func-langMatches
+
+    
+    """
     langTag=e.arg1
     langRange=e.arg2
 
     if not isinstance(langTag, Literal): return SPARQLError('Expected a string/literal')
     if not isinstance(langRange, Literal): return SPARQLError('Expected a string/literal')
+
+    if langTag=="": return Literal(False) # nothing matches empty!
 
     return Literal(_lang_range_check(langRange,langTag))
     
@@ -214,7 +221,7 @@ def Builtin_BOUND(e, ctx):
     return Literal(not isinstance(n, Variable))
 
 def UnaryNot(expr,ctx):    
-    return Literal(EBV(expr.expr))
+    return Literal(not EBV(expr.expr))
 
 def UnaryMinus(expr,ctx):
     return Literal(-numeric(expr.expr))
@@ -463,22 +470,25 @@ def _lang_range_check(range, lang) :
 	rangeList = range.strip().lower().split('-')
 	langList  = lang.strip().lower().split('-')
 	if not _match(rangeList[0], langList[0]) : return False
-	
-	rI = 1
-	rL = 1
-	while rI < len(rangeList) :
-		if rangeList[rI] == '*' :
-			rI += 1
-			continue
-		if rL >= len(langList) :
-			return False
-		if _match(rangeList[rI], langList[rL]) :
-			rI += 1
-			rL += 1
-			continue
-		if len(langList[rL]) == 1 :
-			return False
-		else :
-			rL += 1
-			continue
-	return True
+        if len(rangeList)>len(langList): return False 
+
+	return all(_match(*x) for x in zip(rangeList, langList))
+
+	# rI = 1
+	# rL = 1
+	# while rI < len(rangeList) :
+	# 	if rangeList[rI] == '*' :
+	# 		rI += 1
+	# 		continue
+	# 	if rL >= len(langList) :
+	# 		return False
+	# 	if _match(rangeList[rI], langList[rL]) :
+	# 		rI += 1
+	# 		rL += 1
+	# 		continue
+	# 	if len(langList[rL]) == 1 :
+	# 		return False
+	# 	else :
+	# 		rL += 1
+	# 		continue
+	# return True

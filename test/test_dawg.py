@@ -33,15 +33,23 @@ errors=collections.Counter()
 failed_tests=[]
 error_tests=[]
 
+
+def pp_binding(solutions): 
+    return "\n["+",\n\t".join("{" + ", ".join("%s:%s"%(x[0], x[1].n3()) for x in bindings.items()) + "}" for bindings in solutions)+"]\n"
+
 def do_test_single(t):
-    uri, name,comment,data,query,resfile=t
+    uri, name,comment,data,graphdata,query,resfile=t
 
     try: 
         g=ConjunctiveGraph()
         if data:
-            g.load(data, 
-                   publicID=URIRef(os.path.basename(data)), 
+            g.default_context.load(data, format='turtle')
+
+        if graphdata:
+            g.load(graphdata, 
+                   publicID=URIRef(os.path.basename(graphdata)), 
                    format='turtle')
+
 
         s=SPARQLProcessor(g)
 
@@ -74,7 +82,7 @@ def do_test_single(t):
             eq(res.type, res2.type, 'Types do not match: %r != %r'%(res.type, res2.type))
             if res.type=='SELECT':
                 eq(set(res.vars),set(res2.vars), 'Vars do not match: %r != %r'%(set(res.vars),set(res2.vars)))
-                eq(set(frozenset(x.iteritems()) for x in res.bindings), set(frozenset(x.iteritems()) for x in res2.bindings), 'Bindings do not match: %r != %r'%(res.bindings, res2.bindings))
+                eq(set(frozenset(x.iteritems()) for x in res.bindings), set(frozenset(x.iteritems()) for x in res2.bindings), 'Bindings do not match: %r != %r'%(pp_binding(res.bindings), pp_binding(res2.bindings)))
             elif res.type=='ASK':
                 eq(res.askAnswer, res2.askAnswer, "Ask answer does not match: %r != %r"%(res.askAnswer, res2.askAnswer))
                 
@@ -100,6 +108,11 @@ def do_test_single(t):
                 print "----------------- DATA --------------------"
                 print ">>>", data
                 print file(data[7:]).read()
+            if graphdata: 
+                print "----------------- GRAPHDATA --------------------"
+                print ">>>", graphdata
+                print file(graphdata[7:]).read()
+                
             print "----------------- Query -------------------"            
             print ">>>", query
             print file(query[7:]).read()
@@ -115,8 +128,9 @@ def do_test_single(t):
             except: 
                 print "(parser error)"
 
-            import traceback
-            traceback.print_exc()
+            #import traceback
+            #traceback.print_exc()
+            print e.message.decode('string-escape')
             import pdb
             pdb.post_mortem()
             #pdb.set_trace()
@@ -148,12 +162,12 @@ def read_manifest(f):
                 a=g.value(e, MF.action)
                 query=g.value(a, QT.query)
                 data=g.value(a, QT.data)
-
+                graphdata=g.value(a, QT.graphData)
                 res=g.value(e, MF.result)
                 name=g.value(e, MF.name)
                 comment=g.value(e,RDFS.comment)
                 
-                yield e, _str(name),_str(comment),_str(data),_str(query),_str(res)
+                yield e, _str(name),_str(comment),_str(data),_str(graphdata), _str(query),_str(res)
                 
                         
 
@@ -223,6 +237,6 @@ if __name__=='__main__':
     if success+f+e!=i: 
         print "(Something is wrong, %d!=%d)"%(success+f+e, i)
     
-    print "\n%d tests, %d passed, %d failed, %d errors, (%.2f%% success)"%(i, success, f,e, 100*success/i)
+    print "\n%d tests, %d passed, %d failed, %d errors, (%.2f%% success)"%(i, success, f,e, 100.*success/i)
     print "Took %.2fs"%(time.time()-start)
 

@@ -98,7 +98,7 @@ class FrozenBindings(collections.Mapping):
                 self._hash ^= hash(value)
         return self._hash
 
-    def vars(self, vars):
+    def project(self, vars):
         return FrozenBindings(self.ctx, (x for x in self.iteritems() if x[0] in vars))
     
     def compatible(self, other): 
@@ -128,7 +128,8 @@ class QueryContext(object):
 
     def __init__(self, graph=None): 
         self.bindings=Bindings()
-        self._graph=[graph]
+        self.dataset=graph
+        self._graph=[self.dataset.default_context]
         self.namespace_manager=NamespaceManager(Graph())  # ns man needs a store
         self.base=None
         self.vars=set()
@@ -136,7 +137,7 @@ class QueryContext(object):
         self.bnodes=collections.defaultdict(BNode)
 
     def clone(self): 
-        r=QueryContext()
+        r=QueryContext(self.dataset)
         r.bindings.update(self.bindings)
         r._graph=list(self._graph)
         r.namespace_manager=self.namespace_manager
