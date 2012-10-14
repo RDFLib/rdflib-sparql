@@ -4,8 +4,10 @@ import itertools
 from rdflib.namespace import NamespaceManager
 from rdflib import Variable, BNode, Graph, URIRef, Literal
 
-
 from parserutils import CompValue
+
+import rdflib_sparql
+
 
 class SPARQLError(Exception): 
     def __init__(self,msg=None): 
@@ -83,6 +85,9 @@ class FrozenBindings(collections.Mapping):
         return len(self._d)
 
     def __getitem__(self, key):
+        if not isinstance(key, (BNode, Variable)):
+            return key
+
         return self._d[key]
 
     def __hash__(self):
@@ -151,6 +156,28 @@ class QueryContext(object):
 
     graph=property(_get_graph, doc="current graph")
 
+    def load(self, source, default=False): 
+
+        def _load(graph, source): 
+            try: 
+                return graph.load(source)
+            except: 
+                pass
+            try: 
+                return graph.load(source, format='n3')
+            except:
+                pass
+            try:
+                return graph.load(source, format='nt')
+            except:
+                raise Exception("Could not load %s as either RDF/XML, N3 or NTriples"%source)
+
+        if not rdflib_sparql.SPARQL_LOAD_GRAPHS: return
+        if default: 
+            _load(self.graph, source)
+        else: 
+            _load(self.dataset, source)
+
     def __getitem__(self, key):
         # in SPARQL BNodes are just labels
         if not isinstance(key, (BNode, Variable)):
@@ -197,6 +224,9 @@ class QueryContext(object):
         """
         Apply BASE / PREFIXes to URIs 
         (and to datatypes in Literals)
+
+        TODO: Move resolving URIs to pre-processing
+       
         """
     
         if isinstance(iri, CompValue): 

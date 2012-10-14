@@ -1,0 +1,27 @@
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/basic/manifest#term-8	literal interpret
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-06	literal equal
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-07	literal equality
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-08	literal equality
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-10	literal equality
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-11	literal equality
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-12	literal equality
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-2	xsd:date
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-3	xsd:date
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-04	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-05	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-21	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-23	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-24	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-25	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-26	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-27	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-28	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-29	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/type-promotion/manifest#type-promotion-30	type promotion
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/cast/manifest#cast-dec	no scientific notation for decimals
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-lang-3	literal equality
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#lang-case-insensitive-eq	literal equality
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#lang-case-insensitive-ne	literal equality
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-simple	literal equality
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-eq	literal equality
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-not-eq	literal equality

@@ -26,10 +26,15 @@ class SPARQLProcessor(Processor):
     def __init__(self, graph):
         self.graph=graph
 
-    def query(self, strOrQuery, initBindings={}, initNs={}, DEBUG=False):
+    def query(self, strOrQuery, initBindings={}, initNs={}, base=None, DEBUG=False):
+        """
+        Evaluate a query with the given initial bindings, and initial namespaces
+        The given base is used to resolve relative URIs in the query and 
+        will be overridden by any BASE given in the query
+        """
         
         query=parseQuery(strOrQuery)
         query=translateQuery(query)
         
-        return SPARQLResult(**evalQuery(self.graph, query, initBindings, initNs))
+        return SPARQLResult(**evalQuery(self.graph, query, initBindings, initNs, base))
         

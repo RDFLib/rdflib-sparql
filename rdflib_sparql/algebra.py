@@ -118,7 +118,7 @@ def translateGroupGraphPattern(graphPattern):
         if p.name=='OptionalGraphPattern':
             A=translateGroupGraphPattern(p.graph)
             if A.name=='Filter':
-                G=LeftJoin(G,A,A.expr)
+                G=LeftJoin(G, A.p, A.expr)
             else: 
                 G=LeftJoin(G, A, TrueFilter)
         elif p.name=='MinusGraphPattern': 
@@ -251,11 +251,11 @@ def translateQuery(q):
     """
 
     P=translate(q[1], q[2] if len(q)>2 else None)    
-    
+    datasetClause=q[1].datasetClause
     if q[1].name=='ConstructQuery': 
-        res=q[0],CompValue(q[1].name, p=P, template=q[1].template)
+        res=q[0],CompValue(q[1].name, p=P, template=triples(q[1].template), datasetClause=datasetClause)
     else: 
-        res=q[0],CompValue(q[1].name, p=P)
+        res=q[0],CompValue(q[1].name, p=P, datasetClause=datasetClause)
 
     res=simplify(res)
 

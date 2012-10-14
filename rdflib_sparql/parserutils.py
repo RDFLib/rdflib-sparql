@@ -66,11 +66,10 @@ def value(ctx, val, variables=False, errors=False):
         return [value(ctx,x) for x in val]
 
     elif isinstance(val, (BNode, Variable)):
-        r=ctx[val] 
+        r=ctx.get(val)
         if isinstance(r, SPARQLError) and not errors: 
             raise r
         if r!=None: return r
-
 
         # not bound
         if variables:
@@ -165,7 +164,7 @@ class CompValue(OrderedDict):
         return self._value(OrderedDict.__getitem__(self,a))
 
     def get(self,a,variables=False, errors=False):
-        return self._value(OrderedDict.__getitem__(self,a), variables, errors)
+        return self._value(OrderedDict.get(self,a,a), variables, errors)
 
     def __getattr__(self,a):
         # Hack hack: OrderedDict relies on this
@@ -196,7 +195,6 @@ class Expr(CompValue):
             return e
         finally: 
             self.ctx=None
-
 
 
 class Comp(TokenConverter): 

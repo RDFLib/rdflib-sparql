@@ -5,16 +5,16 @@ from rdflib.query import Result, ResultParser
 RS=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/result-set#')
 
 class RDFResultParser(ResultParser):
-    def parse(self, source):
-        return RDFResult(source)
+    def parse(self, source, **kwargs):
+        return RDFResult(source, **kwargs)
 
 class RDFResult(Result):
     
-    def __init__(self, source): 
+    def __init__(self, source, **kwargs): 
         
         if not isinstance(source,Graph):
             graph=Graph()
-            graph.load(source)
+            graph.load(source, **kwargs)
         else: 
             graph=source
             

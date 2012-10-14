@@ -6,6 +6,8 @@ from decimal import Decimal
 
 import operator as pyop # python operators
 
+import isodate
+
 from rdflib_sparql.parserutils import CompValue, Expr
 from rdflib import URIRef, BNode, Variable, Literal, XSD, RDF
 from rdflib.term import Node
@@ -38,7 +40,7 @@ def Builtin_IRI(expr, ctx):
     if isinstance(a, Literal): 
         return URIRef(a)
 
-    return SPARQLError('IRI function only accepts URIRefs or Literals/Strings!')
+    raise SPARQLError('IRI function only accepts URIRefs or Literals/Strings!')
 
 def Builtin_isBLANK(expr, ctx):
     return Literal( isinstance(expr.arg, BNode) ) 
@@ -72,7 +74,7 @@ def Builtin_BNODE(expr, ctx):
     if isinstance(a, Literal): 
         return ctx.bnodes[a] # defaultdict does the right thing
     
-    return SPARQLError('BNode function only accepts no argument or literal/string')
+    raise SPARQLError('BNode function only accepts no argument or literal/string')
 
 
 def Builtin_ABS(expr, ctx): 
@@ -147,7 +149,7 @@ def Builtin_REGEX(expr, ctx):
 
 def Builtin_STRLEN(e, ctx):
     l=e.arg
-    if not isinstance(l,Literal): return SPARQLError('Can only get length of literal: %s'%l)
+    if not isinstance(l,Literal): raise SPARQLError('Can only get length of literal: %s'%l)
     
     return Literal(len(l))
 
@@ -160,7 +162,7 @@ def Builtin_STR(e, ctx):
 
 def Builtin_LCASE(e, ctx):    
     l=e.arg
-    if not isinstance(l,Literal): return SPARQLError('Can only lower-case literal: %s'%l)
+    if not isinstance(l,Literal): raise SPARQLError('Can only lower-case literal: %s'%l)
     
     return Literal(l.tolower())
 
@@ -173,8 +175,8 @@ def Builtin_LANGMATCHES(e,ctx):
     langTag=e.arg1
     langRange=e.arg2
 
-    if not isinstance(langTag, Literal): return SPARQLError('Expected a string/literal')
-    if not isinstance(langRange, Literal): return SPARQLError('Expected a string/literal')
+    if not isinstance(langTag, Literal): raise SPARQLError('Expected a string/literal')
+    if not isinstance(langRange, Literal): raise SPARQLError('Expected a string/literal')
 
     if langTag=="": return Literal(False) # nothing matches empty!
 
@@ -216,9 +218,80 @@ def Builtin_sameTerm(e,ctx):
     return Literal(a==b)
 
 def Builtin_BOUND(e, ctx):
+    """
+    http://www.w3.org/TR/sparql11-query/#func-bound
+    """
     n=e.get('arg', variables=True)
     
     return Literal(not isinstance(n, Variable))
+
+def Function(e, ctx):
+    """
+    Custom functions (and casts!)
+    """
+
+    if e.iri in XSD_DTs: 
+        # a cast
+
+        if not e.expr: raise SPARQLError("Nothing given to cast.")
+        if len(e.expr)>1: 
+            raise SPARQLError("Cannot cast more than one thing!")
+    
+        x=e.expr[0]
+        
+        if e.iri==XSD.string:
+
+            if isinstance(x, (URIRef, Literal)): 
+                return Literal(x, datatype=XSD.string)
+            else: 
+                raise SPARQLError("Cannot cast term %s of type %s"%(x,type(x)))
+            
+        if not isinstance(x, Literal): 
+            raise SPARQLError("Can only cast Literals to non-string data-types")
+
+        if x.datatype and not x.datatype in XSD_DTs: 
+            raise SPARQLError("Cannot cast literal with unknown datatype: %s"%x.datatype)
+
+        if e.iri==XSD.dateTime:
+            if x.datatype and x.datatype not in (XSD.dateTime, XSD.string): 
+                raise SPARQLError("Cannot cast %s to XSD:dateTime"%x.datatype)
+            try: 
+                return Literal(isodate.parse_datetime(x), datatype=e.iri)
+            except: 
+                raise SPARQLError("Cannot interpret '%s' as datetime"%x)
+
+        if x.datatype == XSD.dateTime: 
+            raise SPARQLError("Cannot cast XSD.dateTime to %s"%e.iri)
+
+        if e.iri in (XSD.float, XSD.double, XSD.decimal):
+            # TODO: Think about handling decimal with decimal module
+            try: 
+                return Literal(float(x), datatype=e.iri)
+            except: 
+                raise SPARQLError("Cannot interpret '%s' as float"%x)
+
+        elif e.iri==XSD.integer:
+            try: 
+                return Literal(int(x), datatype=XSD.integer)
+            except: 
+                raise SPARQLError("Cannot interpret '%s' as int"%x)
+
+        elif e.iri==XSD.boolean:
+            # # I would argue that any number is True... 
+            # try: 
+            #     return Literal(bool(int(x)), datatype=XSD.boolean)
+            # except: 
+            if x.lower() in ("1", "true"): return Literal(True)
+            if x.lower() in ("0", "false"): return Literal(False)
+                
+            raise SPARQLError("Cannot interpret '%s' as bool"%x)
+        else: 
+            raise Exception("I do not know how to cast to %s"%e.iri)
+
+    else: 
+        raise SPARQLError('Unknown function %s"%e.iri')
+
+    # TODO: Custom functions!
 
 def UnaryNot(expr,ctx):    
     return Literal(not EBV(expr.expr))
@@ -310,8 +383,9 @@ def RelationalExpression(e, ctx):
 
     if isinstance(expr, Literal) and isinstance(other, Literal): 
 
-        # if XSD dt we can convert and do many things
-        if expr.datatype in XSD_DTs and other.datatype in XSD_DTs: 
+        # if plain or XSD dt we can convert and do many things
+        if (not expr.datatype and not other.datatype) or \
+                (expr.datatype in XSD_DTs and other.datatype in XSD_DTs):
             pass
         else:             
             # if non-XSD DT, they must be equal 
@@ -358,8 +432,20 @@ def ConditionalOrExpression(e, ctx):
     # we sometimes have nothing to do
     if other is None: 
         return expr
-    
-    return Literal(any(EBV(x) for x in [expr]+other))
+
+    # A logical-or that encounters an error on only one branch 
+    # will return TRUE if the other branch is TRUE and an error 
+    # if the other branch is FALSE.
+    error=None
+    for x in [expr]+other:
+        try: 
+            if EBV(x):
+                return Literal(True)
+        except SPARQLError,e:
+            error=e
+    if error: 
+        raise error
+    return Literal(False)
     
 
 def and_(*args): 

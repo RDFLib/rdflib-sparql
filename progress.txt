@@ -45,3 +45,14 @@ Thu Oct 11 16:29:40 CEST 2012
 
 # More builtins - optional fix
 240 tests, 150 passed, 90 failed, 0 errors, (62.00% success)
+
+Fri Oct 12
+240 tests, 175 passed, 65 failed, 0 errors, (72.92% success)
+
+Sun Oct 14 15:49:35 CEST 2012
+234 tests, 201 passed, 12 failed, 0 errors, 21 skipped (85.90% success)
+
+Sun Oct 14 19:21:00 CEST 2012
+# skips are all literal-equivalence and type promotion
+# to be solved in rdflib literal fix-up
+234 tests, 207 passed, 0 failed, 0 errors, 27 skipped (88.46% success)

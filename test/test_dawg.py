@@ -1,8 +1,9 @@
 import collections
 import os.path
 
-from rdflib import ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef
+from rdflib import ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef, BNode
 from rdflib.query import Result
+from rdflib.compare import isomorphic
 
 from rdflib_sparql.algebra import pprintAlgebra, translateQuery
 from rdflib_sparql.parser import parseQuery
@@ -10,20 +11,26 @@ from rdflib_sparql.processor import SPARQLProcessor
 from rdflib_sparql.results.rdfresults import RDFResultParser
 
 from nose.tools import eq_ as eq
+
+from urlparse import urljoin
+
 import nose
 
 DEBUG_FAIL=True
-DEBUG_FAIL=False
+#DEBUG_FAIL=False
 
 DEBUG_ERROR=True
 #DEBUG_ERROR=False
 
+SPARQL11Tests=True
+SPARQL11Tests=False
 
 DETAILEDASSERT=True
 #DETAILEDASSERT=False
 
 MF=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#')
 QT=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-query#')
+DAWG=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-dawg#')
 
 NAME=None
 
@@ -34,11 +41,51 @@ failed_tests=[]
 error_tests=[]
 
 
+def bindingsCompatible(a,b):
+
+    def rowCompatible(x,y):
+        m={}
+        y=dict(y)
+        for v1,b1 in x:
+            if v1 not in y: return False
+            if isinstance(b1, BNode):
+                if b1 in m:
+                    if y[v1]!=m[b1]: return False
+                else:
+                    m[b1]=y[v1]
+            else: 
+                if y[v1]!=b1: return False
+        return True
+
+    if not a: 
+        if b: 
+            return False 
+        return True
+    
+    x=iter(a).next()
+    
+    for y in b: 
+        if rowCompatible(x,y):
+            if bindingsCompatible(a-set((x,)), b-set((y,))):
+                return True
+
+    return False
+    
+    
+            
+
+
 def pp_binding(solutions): 
     return "\n["+",\n\t".join("{" + ", ".join("%s:%s"%(x[0], x[1].n3()) for x in bindings.items()) + "}" for bindings in solutions)+"]\n"
 
 def do_test_single(t):
     uri, name,comment,data,graphdata,query,resfile=t
+
+    def skip(reason='(none)'): 
+        print "Skipping %s from now on."%uri
+        f=file("skiptests.list","a")
+        f.write("%s\t%s\n"%(uri, reason))
+        f.close()
 
     try: 
         g=ConjunctiveGraph()
@@ -46,45 +93,57 @@ def do_test_single(t):
             g.default_context.load(data, format='turtle')
 
         if graphdata:
-            g.load(graphdata, 
-                   publicID=URIRef(os.path.basename(graphdata)), 
-                   format='turtle')
+            for x in graphdata:
+                g.load(x, 
+#                       publicID=URIRef('http://ba.se/'+os.path.basename(x)),
+                       format='turtle')
 
 
+        # Do the query!
         s=SPARQLProcessor(g)
 
-        res2=s.query(file(query[7:]).read())
+        res2=s.query(file(query[7:]).read(), base=urljoin(query,'.'))
 
         if not resfile: 
             return # done - nothing to check
 
         if resfile.endswith('ttl'):
             resg=Graph()
-            resg.load(resfile, format='turtle')
+            resg.load(resfile, format='turtle', publicID=resfile)
             res=RDFResultParser().parse(resg)
         elif resfile.endswith('rdf'):
             resg=Graph()
-            resg.load(resfile)
+            resg.load(resfile, publicID=resfile)
             res=RDFResultParser().parse(resg)            
         else:
-            res=Result.parse(file(resfile[7:]),format='xml') # relies on rdfextras
+            res=Result.parse(file(resfile[7:]),format='xml') 
 
 
         if not DETAILEDASSERT:
             eq(res.type, res2.type, 'Types do not match')
             if res.type=='SELECT':
                 eq(set(res.vars),set(res2.vars), 'Vars do not match')
-                eq(set(frozenset(x.iteritems()) for x in res.bindings), set(frozenset(x.iteritems()) for x in res2.bindings), 'Bindings do not match')
+                assert bindingsCompatible(set(frozenset(x.iteritems()) for x in res.bindings), set(frozenset(x.iteritems()) for x in res2.bindings)), 'Bindings do not match'
             elif res.type=='ASK':
                 eq(res.askAnswer, res2.askAnswer, 'Ask answer does not match')
+            elif res.type in ('DESCRIBE', 'CONSTRUCT'):
+                assert isomorphic(res.graph, res2.graph), 'graphs are not isomorphic!'
+            else: 
+                raise Exception('Unknown result type: %s'%res.type)
         else:
 
             eq(res.type, res2.type, 'Types do not match: %r != %r'%(res.type, res2.type))
             if res.type=='SELECT':
                 eq(set(res.vars),set(res2.vars), 'Vars do not match: %r != %r'%(set(res.vars),set(res2.vars)))
-                eq(set(frozenset(x.iteritems()) for x in res.bindings), set(frozenset(x.iteritems()) for x in res2.bindings), 'Bindings do not match: %r != %r'%(pp_binding(res.bindings), pp_binding(res2.bindings)))
+                assert bindingsCompatible(set(frozenset(x.iteritems()) for x in res.bindings), set(frozenset(x.iteritems()) for x in res2.bindings)), 'Bindings do not match: %r != %r'%(pp_binding(res.bindings), pp_binding(res2.bindings))
             elif res.type=='ASK':
                 eq(res.askAnswer, res2.askAnswer, "Ask answer does not match: %r != %r"%(res.askAnswer, res2.askAnswer))
+            elif res.type in ('DESCRIBE', 'CONSTRUCT'):
+                assert isomorphic(res.graph, res2.graph), 'graphs are no isomorphic!'
+            else: 
+                raise Exception('Unknown result type: %s'%res.type)
+
+                
                 
 
 
@@ -99,7 +158,7 @@ def do_test_single(t):
             # else:
             #     m=e.message
             error_tests.append(uri)
-            errors[e]+=1
+            errors[str(e)]+=1
 
         if DEBUG_ERROR and not isinstance(e,AssertionError) or DEBUG_FAIL: # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
             print name
@@ -110,8 +169,9 @@ def do_test_single(t):
                 print file(data[7:]).read()
             if graphdata: 
                 print "----------------- GRAPHDATA --------------------"
-                print ">>>", graphdata
-                print file(graphdata[7:]).read()
+                for x in graphdata: 
+                    print ">>>", x
+                    print file(x[7:]).read()
                 
             print "----------------- Query -------------------"            
             print ">>>", query
@@ -131,10 +191,11 @@ def do_test_single(t):
             #import traceback
             #traceback.print_exc()
             print e.message.decode('string-escape')
+            
             import pdb
             pdb.post_mortem()
             #pdb.set_trace()
-            nose.tools.set_trace()
+            #nose.tools.set_trace()
         raise
 
     
@@ -158,16 +219,16 @@ def read_manifest(f):
 
         for col in g.objects(m,MF.entries):
             for e in g.items(col):
-                
+                if not (e,DAWG.approval,DAWG.Approved) in g: continue
                 a=g.value(e, MF.action)
                 query=g.value(a, QT.query)
                 data=g.value(a, QT.data)
-                graphdata=g.value(a, QT.graphData)
+                graphdata=list(g.objects(a, QT.graphData))
                 res=g.value(e, MF.result)
                 name=g.value(e, MF.name)
                 comment=g.value(e,RDFS.comment)
                 
-                yield e, _str(name),_str(comment),_str(data),_str(graphdata), _str(query),_str(res)
+                yield e, _str(name),_str(comment),_str(data), graphdata, _str(query),_str(res)
                 
                         
 
@@ -175,9 +236,10 @@ def test_dawg():
 
     for t in read_manifest("test/DAWG/data-r2/manifest-evaluation.ttl"):
         yield do_test_single, t
-        
-    #for t in read_manifest("test/DAWG/data-sparql11/manifest-all.ttl"):
-    #    yield do_test_single, t
+
+    if SPARQL11Tests:
+        for t in read_manifest("test/DAWG/data-sparql11/manifest-all.ttl"):
+            yield do_test_single, t
 
 
 if __name__=='__main__':
@@ -189,9 +251,20 @@ if __name__=='__main__':
         DEBUG_FAIL=True
     i=0
     success=0
+
+    try:
+        skiptests=dict([(URIRef(x.strip().split("\t")[0]), x.strip().split("\t")[1]) for x in file("skiptests.list")])
+    except IOError:
+        skiptests=set()
+
+    skip=0
     for f, t in test_dawg():
         if NAME and str(t[0])!=NAME: continue
         i+=1
+        if t[0] in skiptests:
+            print "skipping %s - %s"%(t[0],skiptests[t[0]])
+            skip+=1
+            continue
         try: 
             f(t)
             success+=1
@@ -234,9 +307,9 @@ if __name__=='__main__':
     f=sum(fails.values())
     e=sum(errors.values())
 
-    if success+f+e!=i: 
-        print "(Something is wrong, %d!=%d)"%(success+f+e, i)
+    if success+f+e+skip!=i: 
+        print "(Something is wrong, %d!=%d)"%(success+f+e+skip, i)
     
-    print "\n%d tests, %d passed, %d failed, %d errors, (%.2f%% success)"%(i, success, f,e, 100.*success/i)
+    print "\n%d tests, %d passed, %d failed, %d errors, %d skipped (%.2f%% success)"%(i, success, f,e, skip, 100.*success/i)
     print "Took %.2fs"%(time.time()-start)
 

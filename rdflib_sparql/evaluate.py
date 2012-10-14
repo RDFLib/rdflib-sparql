@@ -1,9 +1,10 @@
-from rdflib import Variable, URIRef, Literal, Graph, ConjunctiveGraph
+import collections
+
+from rdflib import Variable, URIRef, Literal, Graph, ConjunctiveGraph, BNode
 
 from rdflib_sparql.parserutils import CompValue, Expr, value
 from rdflib_sparql.operators import EBV
-from rdflib_sparql.algebra import triples
-from rdflib_sparql.sparql import QueryContext, NotBoundError, AlreadyBound, SPARQLError
+from rdflib_sparql.sparql import QueryContext, AlreadyBound, SPARQLError
 
 
 def _diff(a,b, expr): 
@@ -43,10 +44,16 @@ def _ebv(expr, ctx):
             return False # filter error == False
     elif isinstance(expr, CompValue): 
         raise Exception("Weird - filter got a CompValue without evalfn! %r"%expr)
+    elif isinstance(expr, Variable): 
+        try: 
+            return EBV(ctx[expr])
+        except: 
+            return False
     return False
 
 
 def _filter(a,expr): 
+    #import pdb; pdb.set_trace()
     for c in a:
         if _ebv(expr, c):
             yield c
@@ -94,7 +101,6 @@ def evalBGP(ctx, bgp):
     
     
 def evalJoin(ctx, join): 
-
     a=set(evalPart(ctx, join.p1))
     b=set(evalPart(ctx, join.p2))
     return _join(a,b)
@@ -116,6 +122,8 @@ def evalLeftJoin(ctx, join):
     return res
 
 def evalFilter(ctx, part): 
+    #import pdb; pdb.set_trace()
+
     return _filter(evalPart(ctx, part.p), part.expr)
 
 def evalGraph(ctx, part): 
@@ -219,7 +227,7 @@ def evalOrderBy(ctx, part):
 def evalSlice(ctx, slice): 
     res,var=evalPart(ctx, slice.p)
     
-    if slice.length:
+    if slice.length is not None:
         return list(res)[slice.start:slice.start+slice.length],var
     else: 
         return list(res)[slice.start:],var
@@ -248,11 +256,12 @@ def evalProject(ctx, project):
     
        
 
-def evalSelectQuery(ctx, query):
+def evalSelectQuery(ctx, query):            
 
     res={}
     res["type_"]="SELECT"    
     res["bindings"],res["vars_"]=evalPart(ctx, query.p)
+
 
     return res
 
@@ -269,20 +278,24 @@ def evalAskQuery(ctx, query):
     return res
 
 def evalConstructQuery(ctx, query):
-
-    template=triples(query.template)
+    #import pdb; pdb.set_trace()
+    template=query.template
 
     graph=Graph()
 
     bindings,var=evalPart(ctx, query.p)
 
     for c in bindings:
+        bnodeMap=collections.defaultdict(BNode) 
         for t in template:
             s,p,o=[c.absolutize(x) for x in t]
 
-            _s=ctx[s]
-            _p=ctx[p]
-            _o=ctx[o]
+            _s=c.get(s)
+            _p=c.get(p)
+            _o=c.get(o)
+
+            # instantiate new bnodes for each solution
+            _s,_p,_o=[bnodeMap[x] if isinstance(x,BNode) else y for x,y in zip(t,(_s,_p,_o))]
 
             if _s is not None and \
                     _p is not None and \
@@ -297,8 +310,10 @@ def evalConstructQuery(ctx, query):
     return res
 
 
-def evalQuery(graph, query, initBindings, initNs):
+def evalQuery(graph, query, initBindings, initNs, base=None):
     ctx=QueryContext(graph)
+    if base:
+        ctx.base=base
 
     if initBindings:
         for k,v in initBindings.iteritems(): 
@@ -317,7 +332,27 @@ def evalQuery(graph, query, initBindings, initNs):
             ctx.base=x.iri
         elif x.name=='PrefixDecl':
             ctx.namespace_manager.bind(x.prefix, ctx.absolutize(x.iri))
-            
+
     main=query[1]
 
+    #import pdb; pdb.set_trace()
+    if main.datasetClause:
+        ctx=ctx.clone() # or push/pop?
+
+        firstDefault=False
+        for d in main.datasetClause:
+            if d.default:
+
+                if firstDefault:
+                    # replace current default graph
+                    dg=ctx.dataset.get_context(BNode())
+                    ctx.pushGraph(dg)
+                
+                g=ctx.absolutize(d.default)
+                ctx.load(g, default=True)
+
+            elif d.named:
+                g=ctx.absolutize(d.named)
+                ctx.load(g, default=False)
+        
     return evalPart(ctx, main)

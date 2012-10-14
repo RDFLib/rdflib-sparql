@@ -626,13 +626,13 @@ BuiltInCall = Aggregate \
     | NotExistsFunc
 
 # [71] ArgList ::= NIL | '(' 'DISTINCT'? Expression ( ',' Expression )* ')'
-ArgList = NIL | '(' + _Distinct + Expression + ZeroOrMore( ',' + Expression ) + ')'
+ArgList = NIL | '(' + Param('distinct', _Distinct) + ParamList('expr', Expression) + ZeroOrMore( ',' + ParamList('iri', Expression) ) + ')'
 
 # [128] iriOrFunction ::= iri Optional(ArgList)
-iriOrFunction = iri + Optional(ArgList)
+iriOrFunction = ( Comp('Function', Param('iri', iri) + ArgList).setEvalFn(op.Function) ) | iri
 
 # [70] FunctionCall ::= iri ArgList
-FunctionCall = iri + ArgList
+FunctionCall = Comp('Function', Param('iri', iri) + ArgList).setEvalFn(op.Function)
 
 
 # [120] BrackettedExpression ::= '(' Expression ')'
@@ -711,10 +711,10 @@ SourceSelector = iri
 DefaultGraphClause = SourceSelector
 
 # [15] NamedGraphClause ::= 'NAMED' SourceSelector
-NamedGraphClause = Keyword('NAMED') + SourceSelector
+NamedGraphClause = Keyword('NAMED') + Param('named', SourceSelector)
 
 # [13] DatasetClause ::= 'FROM' ( DefaultGraphClause | NamedGraphClause )
-DatasetClause = Comp('DatasetClause', Keyword('FROM') + ( Param('default', DefaultGraphClause) | Param('named', NamedGraphClause) ))
+DatasetClause = Comp('DatasetClause', Keyword('FROM') + ( Param('default', DefaultGraphClause) | NamedGraphClause) )
 
 # [20] GroupCondition ::= BuiltInCall | FunctionCall | '(' Expression ( 'AS' Var )? ')' | Var
 GroupCondition = BuiltInCall | FunctionCall | '(' + Expression + Optional( Keyword('AS') + Var ) + ')' | Var
@@ -869,16 +869,16 @@ SubSelect = Comp ('SubSelect', SelectClause + WhereClause + SolutionModifier + V
 GroupGraphPattern << ( Suppress('{') + ( SubSelect | GroupGraphPatternSub ) + Suppress('}') )
 
 # [7] SelectQuery ::= SelectClause DatasetClause* WhereClause SolutionModifier
-SelectQuery = Comp('SelectQuery', SelectClause + Param('from', ZeroOrMore(DatasetClause) ) + WhereClause + SolutionModifier)
+SelectQuery = Comp('SelectQuery', SelectClause + ZeroOrMore(ParamList('datasetClause', DatasetClause) ) + WhereClause + SolutionModifier)
 
 # [10] ConstructQuery ::= 'CONSTRUCT' ( ConstructTemplate DatasetClause* WhereClause SolutionModifier | DatasetClause* 'WHERE' '{' TriplesTemplate? '}' SolutionModifier )
-ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( ConstructTemplate  + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier ) )
+ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( ConstructTemplate  + Param('datasetClause', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier ) )
 
 # [12] AskQuery ::= 'ASK' DatasetClause* WhereClause SolutionModifier
-AskQuery = Comp('AskQuery', Keyword('ASK') + Param('from', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier)
+AskQuery = Comp('AskQuery', Keyword('ASK') + Param('datasetClause', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier)
 
 # [11] DescribeQuery ::= 'DESCRIBE' ( VarOrIri+ | '*' ) DatasetClause* WhereClause? SolutionModifier
-DescribeQuery = Comp('DescribeQuery', Keyword('DESCRIBE') + (OneOrMore(ParamList('var',VarOrIri)) | '*' ) + Param('from', ZeroOrMore(DatasetClause)) + Optional(WhereClause) + SolutionModifier)
+DescribeQuery = Comp('DescribeQuery', Keyword('DESCRIBE') + (OneOrMore(ParamList('var',VarOrIri)) | '*' ) + Param('datasetClause', ZeroOrMore(DatasetClause)) + Optional(WhereClause) + SolutionModifier)
 
 # [29] Update ::= Prologue ( Update1 ( ';' Update )? )?
 Update = Forward()
