@@ -56,3 +56,17 @@ Sun Oct 14 19:21:00 CEST 2012
 # skips are all literal-equivalence and type promotion
 # to be solved in rdflib literal fix-up
 234 tests, 207 passed, 0 failed, 0 errors, 27 skipped (88.46% success)
+
+# ------------------------------------------------------------------------
+# SPARQL 11 test 
+
+# Only QuerySyntax+QueryEval tests
+457 tests, 238 passed, 11 failed, 181 errors, 27 skipped (52.08% success)
+
+# Implemented Extend
+457 tests, 263 passed, 12 failed, 155 errors, 27 skipped (57.55% success)
+
+# Implemented a bit of aggregation logic
+457 tests, 270 passed, 15 failed, 145 errors, 27 skipped (59.08% success)
+
+

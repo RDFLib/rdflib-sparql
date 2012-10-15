@@ -4,7 +4,26 @@ from rdflib import Variable, URIRef, Literal, Graph, ConjunctiveGraph, BNode
 
 from rdflib_sparql.parserutils import CompValue, Expr, value
 from rdflib_sparql.operators import EBV
-from rdflib_sparql.sparql import QueryContext, AlreadyBound, SPARQLError
+from rdflib_sparql.sparql import QueryContext, AlreadyBound, SPARQLError, FrozenBindings
+
+
+"""
+These method recursively evaluate the SPARQL Algebra 
+
+evalQuery is the entry-point, it will setup context and 
+return the SPARQLResult object
+
+evalPart is called on each level and will delegate to the right method
+
+A rdflib_sparql.sparql.QueryContext is passed along, keeping
+information needed for evaluation
+
+A list of dicts (solution mappings) is returned, apart from GroupBy which may also return a dict of list of dicts
+
+"""
+
+
+
 
 
 def _diff(a,b, expr): 
@@ -50,6 +69,16 @@ def _ebv(expr, ctx):
         except: 
             return False
     return False
+
+def _eval(expr, ctx):
+    if isinstance(expr, Expr):         
+        return expr.eval(ctx)
+    elif isinstance(expr, Variable): 
+        return ctx[expr]
+    elif isinstance(expr, CompValue): 
+        raise Exception("Weird - _eval got a CompValue without evalfn! %r"%expr)
+    else: 
+        raise Exception("Cannot eval thing: %s (%s)"%(expr, type(expr)))
 
 
 def _filter(a,expr): 
@@ -98,9 +127,17 @@ def evalBGP(ctx, bgp):
 
 
 
-    
+def evalExtend(ctx, extend): 
+    # TODO: Deal with dict returned from evalPart from GROUP BY
+
+    return [c.merge({extend.var: _eval(extend.expr,c)}) for c in evalPart(ctx, extend.p)]
+        
     
 def evalJoin(ctx, join): 
+
+    # TODO: Deal with dict returned from evalPart from GROUP BY
+    # only ever for join.p1
+
     a=set(evalPart(ctx, join.p1))
     b=set(evalPart(ctx, join.p2))
     return _join(a,b)
@@ -123,6 +160,8 @@ def evalLeftJoin(ctx, join):
 
 def evalFilter(ctx, part): 
     #import pdb; pdb.set_trace()
+
+    # TODO: Deal with dict returned from evalPart!
 
     return _filter(evalPart(ctx, part.p), part.expr)
 
@@ -171,7 +210,7 @@ def evalPart(ctx, part):
     elif part.name=='ToMultiSet':
         return evalMultiset(ctx,part)
     elif part.name=='Extend':
-        raise Exception('Extend NotYetImplemented!')
+        return evalExtend(ctx, part)
 
     elif part.name=='Project': 
         return evalProject(ctx, part)
@@ -184,7 +223,10 @@ def evalPart(ctx, part):
 
     elif part.name=='OrderBy': 
         return evalOrderBy(ctx, part)
-
+    elif part.name=='Group': 
+        return evalGroup(ctx, part)
+    elif part.name=='AggregateJoin':
+        return evalAggregateJoin(ctx, part)
 
     elif part.name=='SelectQuery': 
         return evalSelectQuery(ctx,part)
@@ -203,7 +245,49 @@ def evalPart(ctx, part):
         
 
 
+def evalGroup(ctx, group): 
+    p=evalPart(ctx, group.p)
+    if not group.expr: 
+        return {1:p}
+    else: 
+        res=collections.defaultdict(list)
+        for c in p: 
+            k=tuple(_eval(e, c) for e in group.expr)
+            res[k].append(c)
+        return res
+        
+def evalAggregateJoin(ctx, agg): 
+    #import pdb ; pdb.set_trace()
+    p=evalPart(ctx, agg.p)
+    # p is always a Group, we always get a dict back
 
+    res=[]
+    for row in p: 
+        bindings={}
+        for a in agg.A: 
+            if a.name=='Aggregate_Count':
+                if a.vars=='*':
+                    c=len(p[row])
+                else: 
+                    c=0
+                    for x in p[row]: 
+                        try: 
+                            _eval(a.vars, x)
+                            c+=1
+                        except: 
+                            pass # simply dont count
+                
+                bindings[a.res]=Literal(c)
+            elif a.name=='Aggregate_Sample':
+                try: 
+                    bindings[a.res]=_eval(a.vars, iter(p[row]).next())
+                except StopIteration:
+                    pass # no res
+                        
+            else:
+                raise Exception("Unknown aggregate function "+a.name)
+        res.append(FrozenBindings(ctx, bindings))
+    return res
 
 
 def evalOrderBy(ctx, part): 

@@ -27,6 +27,11 @@ class SPARQLTypeError(SPARQLError):
         SPARQLError.__init__(self, msg)
 
 class Bindings(collections.MutableMapping):
+
+    """
+    In python 3.3 this could be a collections.ChainMap
+    """
+
     def __init__(self, outer=None, d=[]): 
         self._d=dict(d)
         self.outer=outer

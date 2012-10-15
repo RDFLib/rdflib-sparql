@@ -17,13 +17,13 @@ from urlparse import urljoin
 import nose
 
 DEBUG_FAIL=True
-#DEBUG_FAIL=False
+DEBUG_FAIL=False
 
 DEBUG_ERROR=True
-#DEBUG_ERROR=False
+DEBUG_ERROR=False
 
 SPARQL11Tests=True
-SPARQL11Tests=False
+#SPARQL11Tests=False
 
 DETAILEDASSERT=True
 #DETAILEDASSERT=False
@@ -79,7 +79,7 @@ def pp_binding(solutions):
     return "\n["+",\n\t".join("{" + ", ".join("%s:%s"%(x[0], x[1].n3()) for x in bindings.items()) + "}" for bindings in solutions)+"]\n"
 
 def do_test_single(t):
-    uri, name,comment,data,graphdata,query,resfile=t
+    uri, name,comment,data,graphdata,query,resfile,syntax=t
 
     def skip(reason='(none)'): 
         print "Skipping %s from now on."%uri
@@ -99,11 +99,19 @@ def do_test_single(t):
                        format='turtle')
 
 
-        # Do the query!
         s=SPARQLProcessor(g)
 
-        res2=s.query(file(query[7:]).read(), base=urljoin(query,'.'))
-
+        # Do the query!
+        if syntax: 
+            res2=s.query(file(query[7:]).read(), base=urljoin(query,'.'))
+        else: 
+            # negative syntax test
+            try: 
+                res2=s.query(file(query[7:]).read(), base=urljoin(query,'.'))
+                assert False, 'Query should not have parsed!'
+            except: 
+                pass # it's fine - the query should not parse
+        
         if not resfile: 
             return # done - nothing to check
 
@@ -219,16 +227,36 @@ def read_manifest(f):
 
         for col in g.objects(m,MF.entries):
             for e in g.items(col):
+
                 if not (e,DAWG.approval,DAWG.Approved) in g: continue
-                a=g.value(e, MF.action)
-                query=g.value(a, QT.query)
-                data=g.value(a, QT.data)
-                graphdata=list(g.objects(a, QT.graphData))
-                res=g.value(e, MF.result)
+                
+                t=g.value(e, RDF.type)
+                if t in (MF.PositiveUpdateSyntaxTest11, MF.NegativeUpdateSyntaxTest11, MF.UpdateEvaluationTest, MF.ProtocolTest): continue # skip update tests
+
                 name=g.value(e, MF.name)
                 comment=g.value(e,RDFS.comment)
                 
-                yield e, _str(name),_str(comment),_str(data), graphdata, _str(query),_str(res)
+                if t == MF.QueryEvaluationTest:
+                    a=g.value(e, MF.action)
+                    query=g.value(a, QT.query)              
+                    data=g.value(a, QT.data)
+                    graphdata=list(g.objects(a, QT.graphData))
+                    res=g.value(e, MF.result)
+                    syntax=True
+                elif t in (MF.NegativeSyntaxTest11, MF.PositiveSyntaxTest11):
+                    query=g.value(e, MF.action)
+                    if t==MF.NegativeSyntaxTest11:
+                        syntax=False
+                    else: 
+                        syntax=True
+                    data=None
+                    graphdata=None
+                    res=None
+                else: 
+                    print "I dont know DAWG Test Type %s"%t
+                    continue
+                
+                yield e, _str(name),_str(comment),_str(data), graphdata, _str(query),_str(res), syntax
                 
                         
 

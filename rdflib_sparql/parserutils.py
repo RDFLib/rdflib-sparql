@@ -152,7 +152,7 @@ class CompValue(OrderedDict):
         return self.name+"_"+OrderedDict.__str__(self)
 
     def __repr__(self):
-        return self.name+"_"+OrderedDict.__repr__(self)
+        return self.name+"_"+dict.__repr__(self)
 
     def _value(self,val, variables=False, errors=False): 
         if self.ctx!=None: 
