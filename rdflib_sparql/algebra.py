@@ -96,7 +96,7 @@ def translateGroupGraphPattern(graphPattern):
     """
 
     if graphPattern.name=='SubSelect': 
-        return ToMultiSet(translate(graphPattern))
+        return ToMultiSet(translate(graphPattern)[0])
 
     if not graphPattern.part: graphPattern.part=[] # empty { }
 
@@ -130,6 +130,8 @@ def translateGroupGraphPattern(graphPattern):
             G=Join(p1=G, p2=translateGraphGraphPattern(p))
         elif p.name=='InlineData': 
             G=Join(p1=G, p2=translateInlineData(p))
+        elif p.name=='ServiceGraphPattern': 
+            G=Join(p1=G, p2=p)
         elif p.name in ('BGP', 'Extend'): 
             G=Join(p1=G, p2=p)            
         elif p.name=='Filter': 
@@ -152,31 +154,34 @@ class StopTraversal(Exception):
         self.rv=rv
 
 
-def _traverse(e,visit):
+def _traverse(e,visitPre=lambda n: None,visitPost=lambda n: None):
     """
     Traverse a parse-tree, visit each node    
 
     if visit functions return a value, replace current node
     and do not recurse further
     """
-    _e=visit(e)
+    _e=visitPre(e)
     if _e: return _e 
     
     
     if e is None: return None
 
     if isinstance(e, (list, ParseResults)):
-        return [_traverse(x,visit) for x in e]
+        return [_traverse(x,visitPre,visitPost) for x in e]
     elif isinstance(e, tuple):
-        return tuple([_traverse(x,visit) for x in e])
+        return tuple([_traverse(x,visitPre,visitPost) for x in e])
     
     elif isinstance(e, CompValue): 
         for k,val in e.iteritems():
-            e[k]=_traverse(val, visit)
+            e[k]=_traverse(val, visitPre,visitPost)
+
+    _e=visitPost(e)
+    if _e: return _e 
 
     return e
 
-def traverse(tree,visit,complete=None):
+def traverse(tree,visitPre=lambda n: None, visitPost=lambda n: None,complete=None):
     """
     Traverse tree, visit each node with visit function
     visit function may raise StopTraversal to stop traversal
@@ -184,7 +189,7 @@ def traverse(tree,visit,complete=None):
     otherwise the transformed tree is returned
     """
     try:
-        r=_traverse(tree,visit)
+        r=_traverse(tree,visitPre,visitPost)
         if complete is not None: return complete
         return r
     except StopTraversal,st:
@@ -234,7 +239,7 @@ def _sample(e,v=None):
     if isinstance(e, Variable) and v!=e: 
         return CompValue('Aggregate_Sample', vars=e)
 
-def _simplify(e):
+def _simplifyFilters(e):
     if isinstance(e,Expr):
         return simplifyFilters(e)
 
@@ -255,12 +260,12 @@ def translateAggregates(q,M):
         q.expr=es
 
     # having clause
-    if traverse(q.having,_hasAggregate,False):
+    if traverse(q.having,_hasAggregate,complete=False):
         q.having=traverse(q.having, _sample)
         traverse(q.having,functools.partial(_aggs,A=A))
 
     # order by
-    if traverse(q.orderby,_hasAggregate,False):
+    if traverse(q.orderby,_hasAggregate,complete=False):
         q.orderby=traverse(q.orderby, _sample)
         traverse(q.orderby,functools.partial(_aggs,A=A))
 
@@ -283,18 +288,26 @@ def translate(q, values=None):
     """
 
     #import pdb; pdb.set_trace()
-    _traverse(q, _simplify)
+    _traverse(q, _simplifyFilters)
 
     # all query types have a where part
     M=translateGroupGraphPattern(q.where)
 
     aggregate=False
     if q.groupby: 
-        M=Group(p=M, expr=q.groupby.condition)
+        conditions=[]
+        # convert "GROUP BY (?expr as ?var)" to an Extend
+        for c in q.groupby.condition:
+            if isinstance(c,CompValue) and c.name=='GroupAs':
+                M=Extend(M, c.expr, c.var)
+                c=c.var
+            conditions.append(c)
+            
+        M=Group(p=M, expr=conditions)
         aggregate=True
-    elif traverse(q.having,_hasAggregate,False) or \
-            traverse(q.orderby,_hasAggregate,False) or \
-            any(traverse(x, _hasAggregate,False) for x in q.expr or []):
+    elif traverse(q.having, _hasAggregate, complete=False) or \
+            traverse(q.orderby, _hasAggregate, complete=False) or \
+            any(traverse(x, _hasAggregate, complete=False) for x in q.expr or []):
         # if any aggregate is used, implicit group by
         M=Group(p=M)
         aggregate=True
@@ -357,11 +370,16 @@ def translate(q, values=None):
 
 
 
-    return M
+    return M, PV
 
 
-def simplify(q): 
-    return q
+def simplify(n): 
+    if isinstance(n, CompValue) and n.name=='Join':
+        if n.p1.name=='BGP' and len(n.p1.triples)==0:
+            return n.p2
+        if n.p2.name=='BGP' and len(n.p2.triples)==0:
+            return n.p1
+
     
 def translateQuery(q): 
     """
@@ -369,14 +387,14 @@ def translateQuery(q):
     (prologue, selectquery, [values])
     """
 
-    P=translate(q[1], q[2] if len(q)>2 else None)    
+    P,PV=translate(q[1], q[2] if len(q)>2 else None)    
     datasetClause=q[1].datasetClause
     if q[1].name=='ConstructQuery': 
         res=q[0],CompValue(q[1].name, p=P, template=triples(q[1].template), datasetClause=datasetClause)
     else: 
-        res=q[0],CompValue(q[1].name, p=P, datasetClause=datasetClause)
+        res=q[0],CompValue(q[1].name, p=P, datasetClause=datasetClause, PV=PV)
 
-    #res=simplify(res)
+    res=traverse(res,visitPost=simplify)
 
     return res
     

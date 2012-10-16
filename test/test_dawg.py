@@ -101,19 +101,23 @@ def do_test_single(t):
 
         s=SPARQLProcessor(g)
 
-        # Do the query!
-        if syntax: 
-            res2=s.query(file(query[7:]).read(), base=urljoin(query,'.'))
-        else: 
-            # negative syntax test
-            try: 
-                res2=s.query(file(query[7:]).read(), base=urljoin(query,'.'))
-                assert False, 'Query should not have parsed!'
-            except: 
-                pass # it's fine - the query should not parse
-        
         if not resfile: 
-            return # done - nothing to check
+            # no result - syntax test
+
+            if syntax: 
+                translateQuery(parseQuery(file(query[7:]).read()))
+            else: 
+                # negative syntax test
+                try: 
+                    translateQuery(parseQuery(file(query[7:]).read()))
+
+                    assert False, 'Query should not have parsed!'
+                except: 
+                    pass # it's fine - the query should not parse
+            return
+
+        # eval test - carry out query
+        res2=s.query(file(query[7:]).read(), base=urljoin(query,'.'))
 
         if resfile.endswith('ttl'):
             resg=Graph()
@@ -169,6 +173,8 @@ def do_test_single(t):
             errors[str(e)]+=1
 
         if DEBUG_ERROR and not isinstance(e,AssertionError) or DEBUG_FAIL: # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
+            print "======================================"
+            print uri
             print name
             print comment
             if data: 
@@ -287,7 +293,7 @@ if __name__=='__main__':
 
     skip=0
     for f, t in test_dawg():
-        if NAME and str(t[0])!=NAME: continue
+        if NAME and not str(t[0]).startswith(NAME): continue
         i+=1
         if t[0] in skiptests:
             print "skipping %s - %s"%(t[0],skiptests[t[0]])

@@ -1,10 +1,12 @@
 import collections
 
-from rdflib import Variable, URIRef, Literal, Graph, ConjunctiveGraph, BNode
+from rdflib import Variable, Graph, ConjunctiveGraph, BNode
 
-from rdflib_sparql.parserutils import CompValue, Expr, value
-from rdflib_sparql.operators import EBV
-from rdflib_sparql.sparql import QueryContext, AlreadyBound, SPARQLError, FrozenBindings
+from rdflib_sparql.parserutils import value
+from rdflib_sparql.sparql import QueryContext, AlreadyBound, FrozenBindings, SPARQLError
+from rdflib_sparql.evalutils import _filter, _eval, _join, _diff, _minus
+
+from rdflib_sparql.aggregates import evalAgg
 
 
 """
@@ -22,79 +24,16 @@ A list of dicts (solution mappings) is returned, apart from GroupBy which may al
 
 """
 
-
-
-
-
-def _diff(a,b, expr): 
-    res=set()
-    for x in a: 
-        if all(not x.compatible(y) or not _ebv(expr,x.merge(y)) for y in b): 
-            res.add(x)
-
-    return res
-
-def _join(a,b):
-    res=set()
-    for x in a: 
-        for y in b: 
-            if x.compatible(y):
-                res.add(x.merge(y))
-    return res
-
-def _ebv(expr, ctx): 
-
-    """
-    Return true/false for the given expr
-    Either the expr is itself true/false
-    or evaluates to something, with the given ctx
-
-    an error is false
-    """
-
-    try: 
-        return EBV(expr)
-    except SPARQLError: 
-        pass 
-    if isinstance(expr, Expr):         
-        try: 
-            return EBV(expr.eval(ctx))
-        except SPARQLError: 
-            return False # filter error == False
-    elif isinstance(expr, CompValue): 
-        raise Exception("Weird - filter got a CompValue without evalfn! %r"%expr)
-    elif isinstance(expr, Variable): 
-        try: 
-            return EBV(ctx[expr])
-        except: 
-            return False
-    return False
-
-def _eval(expr, ctx):
-    if isinstance(expr, Expr):         
-        return expr.eval(ctx)
-    elif isinstance(expr, Variable): 
-        return ctx[expr]
-    elif isinstance(expr, CompValue): 
-        raise Exception("Weird - _eval got a CompValue without evalfn! %r"%expr)
-    else: 
-        raise Exception("Cannot eval thing: %s (%s)"%(expr, type(expr)))
-
-
-def _filter(a,expr): 
-    #import pdb; pdb.set_trace()
-    for c in a:
-        if _ebv(expr, c):
-            yield c
-
-
-
 def evalBGP(ctx, bgp): 
+
+    """
+    A basic graph pattern
+    """
     
     if not bgp:
-        yield ctx.solution()
-        return 
+        return [ctx.solution()]
 
+    res=[]
     s,p,o=[ctx.absolutize(x) for x in bgp[0]]
 
     _s=ctx[s]
@@ -118,19 +57,26 @@ def evalBGP(ctx, bgp):
             except AlreadyBound: 
                 continue
 
-            for _ctx in evalBGP(ctx,bgp[1:]): 
-                yield _ctx
+            res+=evalBGP(ctx,bgp[1:])
 
         finally:
             if None in (_s,_p,_o): 
                 ctx.pop()
 
-
+    return res
 
 def evalExtend(ctx, extend): 
     # TODO: Deal with dict returned from evalPart from GROUP BY
-
-    return [c.merge({extend.var: _eval(extend.expr,c)}) for c in evalPart(ctx, extend.p)]
+    
+    res=[]
+    for c in evalPart(ctx, extend.p):
+        e=_eval(extend.expr,c)
+        if not isinstance(e, SPARQLError):
+            res.append(c.merge({extend.var: e}))
+        else: 
+            res.append(c)
+    return res
+               
         
     
 def evalJoin(ctx, join): 
@@ -147,6 +93,11 @@ def evalUnion(ctx, union):
     res.update(evalPart(ctx, union.p1))
     res.update(evalPart(ctx, union.p2))
     return res
+
+def evalMinus(ctx, minus): 
+    a=set(evalPart(ctx, minus.p1))
+    b=set(evalPart(ctx, minus.p2))
+    return _minus(a,b)
 
 def evalLeftJoin(ctx, join): 
 
@@ -190,6 +141,7 @@ def evalGraph(ctx, part):
             yield x
         
 def evalMultiset(ctx, part): 
+    #import pdb; pdb.set_trace()
     return evalPart(ctx, part.p)
 
 def evalPart(ctx, part):
@@ -201,16 +153,16 @@ def evalPart(ctx, part):
         return evalJoin(ctx, part)
     elif part.name=='LeftJoin':
         return evalLeftJoin(ctx, part)
-    elif part.name=='Minus':
-        raise Exception('Minus NotYetImplemented!')    
     elif part.name=='Graph':
         return evalGraph(ctx, part)
     elif part.name=='Union':
         return evalUnion(ctx, part)
     elif part.name=='ToMultiSet':
         return evalMultiset(ctx,part)
-    elif part.name=='Extend':
+    elif part.name=='Extend':        
         return evalExtend(ctx, part)
+    elif part.name=='Minus': 
+        return evalMinus(ctx, part)
 
     elif part.name=='Project': 
         return evalProject(ctx, part)
@@ -246,6 +198,11 @@ def evalPart(ctx, part):
 
 
 def evalGroup(ctx, group): 
+
+    """
+    http://www.w3.org/TR/sparql11-query/#defn_algGroup
+    """
+
     p=evalPart(ctx, group.p)
     if not group.expr: 
         return {1:p}
@@ -265,27 +222,8 @@ def evalAggregateJoin(ctx, agg):
     for row in p: 
         bindings={}
         for a in agg.A: 
-            if a.name=='Aggregate_Count':
-                if a.vars=='*':
-                    c=len(p[row])
-                else: 
-                    c=0
-                    for x in p[row]: 
-                        try: 
-                            _eval(a.vars, x)
-                            c+=1
-                        except: 
-                            pass # simply dont count
-                
-                bindings[a.res]=Literal(c)
-            elif a.name=='Aggregate_Sample':
-                try: 
-                    bindings[a.res]=_eval(a.vars, iter(p[row]).next())
-                except StopIteration:
-                    pass # no res
-                        
-            else:
-                raise Exception("Unknown aggregate function "+a.name)
+            evalAgg(a,p[row],bindings)
+
         res.append(FrozenBindings(ctx, bindings))
     return res
 
@@ -298,7 +236,7 @@ def evalOrderBy(ctx, part):
 
         def val(x): 
             try: 
-                return value(x, e.expr)
+                return value(x, e.expr) 
             except: 
                 return None
         
@@ -309,18 +247,18 @@ def evalOrderBy(ctx, part):
         
 
 def evalSlice(ctx, slice): 
-    res,var=evalPart(ctx, slice.p)
+    res=evalPart(ctx, slice.p)
     
     if slice.length is not None:
-        return list(res)[slice.start:slice.start+slice.length],var
+        return list(res)[slice.start:slice.start+slice.length]
     else: 
-        return list(res)[slice.start:],var
+        return list(res)[slice.start:]
 
 def evalReduced(ctx, part): 
     return evalPart(ctx, part.p) # TODO!
 
 def evalDistinct(ctx, part): 
-    res,var=evalPart(ctx, part.p)
+    res=evalPart(ctx, part.p)
 
     nodups=[]
     done=set()
@@ -329,47 +267,40 @@ def evalDistinct(ctx, part):
             nodups.append(x)
             done.add(x)
 
-    return nodups, var
+    return nodups
 
 def evalProject(ctx, project): 
     res=evalPart(ctx, project.p)
-    if project.PV: 
-        return [ row.project(project.PV) for row in res], project.PV
-    else: 
-        return res, project.PV
+
+    return [ row.project(project.PV) for row in res]
+
     
        
 
 def evalSelectQuery(ctx, query):            
 
     res={}
-    res["type_"]="SELECT"    
-    res["bindings"],res["vars_"]=evalPart(ctx, query.p)
-
-
+    res["type_"]="SELECT"        
+    res["bindings"]=evalPart(ctx, query.p)
+    res["vars_"]=query.PV 
     return res
 
 def evalAskQuery(ctx, query):            
-    bindings,var=evalPart(ctx, query.p)
-        
     res={}
     res["type_"]="ASK"
     res["askAnswer"]=False
-    for x in bindings: 
+    for x in evalPart(ctx, query.p):
         res["askAnswer"]=True
         break
 
     return res
 
 def evalConstructQuery(ctx, query):
-    #import pdb; pdb.set_trace()
     template=query.template
 
     graph=Graph()
 
-    bindings,var=evalPart(ctx, query.p)
-
-    for c in bindings:
+    for c in evalPart(ctx, query.p):
         bnodeMap=collections.defaultdict(BNode) 
         for t in template:
             s,p,o=[c.absolutize(x) for x in t]

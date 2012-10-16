@@ -475,17 +475,17 @@ GroupOrUnionGraphPattern = Comp('GroupOrUnionGraphPattern', ParamList('graph', G
 Expression = Forward()
 
 # [72] ExpressionList ::= NIL | '(' Expression ( ',' Expression )* ')'
-ExpressionList = NIL | Group(Suppress('(') + Expression + ZeroOrMore( ',' + Expression ) + Suppress(')') )
+ExpressionList = NIL | Group(Suppress('(') + Expression + ZeroOrMore( Suppress(',') + Expression ) + Suppress(')') )
 
 # [122] RegexExpression ::= 'REGEX' '(' Expression ',' Expression ( ',' Expression )? ')'
 RegexExpression = Comp('Builtin_REGEX',Keyword('REGEX') + '(' + Param('text',Expression) + ',' + Param('pattern',Expression) + Optional( ',' + Param('flags',Expression) ) + ')')
 RegexExpression.setEvalFn(op.Builtin_REGEX)
 
 # [123] SubstringExpression ::= 'SUBSTR' '(' Expression ',' Expression ( ',' Expression )? ')'
-SubstringExpression = Comp('Builtin_SUBSTR', Keyword('SUBSTR') + '(' + Param('source', Expression) + ',' + Param('startingLoc', Expression) + Optional( ',' + Param('length', Expression) ) + ')')
+SubstringExpression = Comp('Builtin_SUBSTR', Keyword('SUBSTR') + '(' + Param('arg', Expression) + ',' + Param('start', Expression) + Optional( ',' + Param('length', Expression) ) + ')').setEvalFn(op.Builtin_SUBSTR)
 
 # [124] StrReplaceExpression ::= 'REPLACE' '(' Expression ',' Expression ',' Expression ( ',' Expression )? ')'
-StrReplaceExpression = Comp('Builtin_REPLACE', Keyword('REPLACE') + '(' + Param('arg', Expression) + ',' + Param('pattern', Expression) + ',' + Param('replacement', Expression) + Optional( ',' + Param('flags',Expression) ) + ')' )
+StrReplaceExpression = Comp('Builtin_REPLACE', Keyword('REPLACE') + '(' + Param('arg', Expression) + ',' + Param('pattern', Expression) + ',' + Param('replacement', Expression) + Optional( ',' + Param('flags',Expression) ) + ')' ).setEvalFn(op.Builtin_REPLACE)
 
 # [125] ExistsFunc ::= 'EXISTS' GroupGraphPattern
 ExistsFunc = Comp('Builtin_EXISTS', Keyword('EXISTS') + Param('graph', GroupGraphPattern))
@@ -583,7 +583,7 @@ BuiltInCall = Aggregate \
     | Comp('Builtin_CEIL', Keyword('CEIL') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_CEIL) \
     | Comp('Builtin_FLOOR', Keyword('FLOOR') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_FLOOR) \
     | Comp('Builtin_ROUND', Keyword('ROUND') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_ROUND) \
-    | Comp('Builtin_CONCAT', Keyword('CONCAT') + Param('arg', ExpressionList ) ) \
+    | Comp('Builtin_CONCAT', Keyword('CONCAT') + Param('arg', ExpressionList ) ).setEvalFn(op.Builtin_CONCAT) \
     | SubstringExpression \
     | Comp('Builtin_STRLEN', Keyword('STRLEN') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_STRLEN) \
     | StrReplaceExpression \
@@ -591,10 +591,10 @@ BuiltInCall = Aggregate \
     | Comp('Builtin_LCASE', Keyword('LCASE') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_LCASE) \
     | Comp('Builtin_ENCODE_FOR_URI', Keyword('ENCODE_FOR_URI') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_CONTAINS', Keyword('CONTAINS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
-    | Comp('Builtin_STRSTARTS', Keyword('STRSTARTS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
-    | Comp('Builtin_STRENDS', Keyword('STRENDS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
-    | Comp('Builtin_STRBEFORE', Keyword('STRBEFORE') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
-    | Comp('Builtin_STRAFTER', Keyword('STRAFTER') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_STRSTARTS', Keyword('STRSTARTS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRSTARTS) \
+    | Comp('Builtin_STRENDS', Keyword('STRENDS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRENDS) \
+    | Comp('Builtin_STRBEFORE', Keyword('STRBEFORE') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRBEFORE) \
+    | Comp('Builtin_STRAFTER', Keyword('STRAFTER') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRAFTER) \
     | Comp('Builtin_YEAR', Keyword('YEAR') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_MONTH', Keyword('MONTH') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_DAY', Keyword('DAY') + '(' + Param('arg', Expression) + ')' ) \
@@ -604,17 +604,17 @@ BuiltInCall = Aggregate \
     | Comp('Builtin_TIMEZONE', Keyword('TIMEZONE') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_TZ', Keyword('TZ') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_NOW', Keyword('NOW') + NIL ) \
-    | Comp('Builtin_UUID', Keyword('UUID') + NIL ) \
-    | Comp('Builtin_STRUUID', Keyword('STRUUID') + NIL ) \
+    | Comp('Builtin_UUID', Keyword('UUID') + NIL ).setEvalFn(op.Builtin_UUID) \
+    | Comp('Builtin_STRUUID', Keyword('STRUUID') + NIL ).setEvalFn(op.Builtin_STRUUID) \
     | Comp('Builtin_MD5', Keyword('MD5') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_SHA1', Keyword('SHA1') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_SHA256', Keyword('SHA256') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_SHA384', Keyword('SHA384') + '(' + Param('arg', Expression) + ')' ) \
     | Comp('Builtin_SHA512', Keyword('SHA512') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_COALESCE', Keyword('COALESCE') + Param('arg', ExpressionList) ) \
-    | Comp('Builtin_IF', Keyword('IF') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ',' + Param('arg3', Expression) + ')' ) \
-    | Comp('Builtin_STRLANG', Keyword('STRLANG') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
-    | Comp('Builtin_STRDT', Keyword('STRDT') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_COALESCE', Keyword('COALESCE') + Param('arg', ExpressionList) ).setEvalFn(op.Builtin_COALESCE) \
+    | Comp('Builtin_IF', Keyword('IF') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ',' + Param('arg3', Expression) + ')' ).setEvalFn(op.Builtin_IF) \
+    | Comp('Builtin_STRLANG', Keyword('STRLANG') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRLANG) \
+    | Comp('Builtin_STRDT', Keyword('STRDT') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRDT) \
     | Comp('Builtin_sameTerm', Keyword('sameTerm') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_sameTerm) \
     | Comp('Builtin_isIRI', Keyword('isIRI') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_isIRI) \
     | Comp('Builtin_isURI', Keyword('isURI') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_isIRI) \
@@ -717,14 +717,14 @@ NamedGraphClause = Keyword('NAMED') + Param('named', SourceSelector)
 DatasetClause = Comp('DatasetClause', Keyword('FROM') + ( Param('default', DefaultGraphClause) | NamedGraphClause) )
 
 # [20] GroupCondition ::= BuiltInCall | FunctionCall | '(' Expression ( 'AS' Var )? ')' | Var
-GroupCondition = BuiltInCall | FunctionCall | '(' + Expression + Optional( Keyword('AS') + Var ) + ')' | Var
+GroupCondition = BuiltInCall | FunctionCall | Comp('GroupAs', '(' + Param('expr', Expression) + Optional( Keyword('AS') + Param('var', Var) ) + ')' ) | Var
 
 # [19] GroupClause ::= 'GROUP' 'BY' GroupCondition+
 GroupClause = Comp('GroupClause', Keyword('GROUP') + Keyword('BY') + OneOrMore(ParamList('condition', GroupCondition)))
 
 
 
-_Silent = Optional(Keyword('SILENT'))
+_Silent = Optional(Param('silent', Keyword('SILENT')))
 
 # [31] Load ::= 'LOAD' 'SILENT'? iri ( 'INTO' GraphRef )?
 Load = Keyword('LOAD') + _Silent + iri + Optional( Keyword('INTO') + GraphRef )
@@ -811,7 +811,7 @@ OptionalGraphPattern = Comp('OptionalGraphPattern', Keyword('OPTIONAL') + Param(
 GraphGraphPattern = Comp('GraphGraphPattern', Keyword('GRAPH') + Param('term', VarOrIri) + Param('graph', GroupGraphPattern))
 
 # [59] ServiceGraphPattern ::= 'SERVICE' _Silent VarOrIri GroupGraphPattern
-ServiceGraphPattern = Keyword('SERVICE') + _Silent + VarOrIri + GroupGraphPattern
+ServiceGraphPattern = Comp('ServiceGraphPattern', Keyword('SERVICE') + _Silent + Param('term', VarOrIri) + Param('graph', GroupGraphPattern))
 
 # [60] Bind ::= 'BIND' '(' Expression 'AS' Var ')'
 Bind = Comp ('Bind', Keyword('BIND') + '(' + Param('expr', Expression) + Keyword('AS') + Param('var', Var) + ')' )

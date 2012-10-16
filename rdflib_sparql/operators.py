@@ -1,6 +1,7 @@
 import re
 import math
 import random
+import uuid
 
 from decimal import Decimal
 
@@ -85,7 +86,13 @@ def Builtin_ABS(expr, ctx):
     return Literal(abs(numeric(expr.arg)))
 
 
+def Builtin_IF(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-if
+    """
 
+    return expr.arg2 if EBV(expr.arg1) else expr.arg3
+    
 
 def Builtin_RAND(expr, ctx): 
     """
@@ -94,6 +101,30 @@ def Builtin_RAND(expr, ctx):
 
     return Literal(random.random())
 
+
+def Builtin_UUID(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-strdt
+    """
+
+    return URIRef(uuid.uuid5().get_urn())
+
+def Builtin_STRUUID(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-strdt
+    """
+
+    return Literal(str(uuid.uuid5()))
+
+
+def Builtin_COALESCE(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-coalesce
+    """
+    for x in expr.arg: 
+        if not isinstance(x, SPARQLError): 
+            return x
+    raise SPARQLError("COALESCE got no arguments that did not evaluate to an error")
 
 def Builtin_CEIL(expr, ctx): 
     """
@@ -124,47 +155,175 @@ def Builtin_REGEX(expr, ctx):
     Functions and Operators section 7.6.1 Regular Expression Syntax
     """
 
-    text = expr.text
-    pattern = expr.pattern
+    text = string(expr.text)
+    pattern = string(expr.pattern)
     flags = expr.flags
-
-    if not isinstance(text, Literal): 
-        raise SPARQLTypeError('RegEx works only on Literals or strings')
-    if not isinstance(pattern, Literal): 
-        raise SPARQLTypeError('RegEx works only on Literals or strings')
         
-
+    cFlag = 0
     if flags:
-        cFlag = 0
-
         # Maps XPath REGEX flags (http://www.w3.org/TR/xpath-functions/#flags)
         # to Python's re flags
         flagMap=dict([('i', re.IGNORECASE), ('s', re.DOTALL), ('m', re.MULTILINE)])
         cFlag=reduce(pyop.or_, [flagMap.get(f,0) for f in flags])
 
-        return Literal(bool(re.compile(unicode(pattern),cFlag).search(text)))
+    return Literal(bool(re.search(unicode(pattern),text,cFlag)))
 
-    else:
-        return Literal(bool(re.compile(unicode(pattern)).search(text)))
+def Builtin_REPLACE(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-substr
+    """
+
+    text = string(expr.text)
+    pattern = string(expr.pattern)
+    replacement = string(expr.replacement)
+    flags = expr.flags
+        
+    cFlag = 0
+    if flags:
+        # Maps XPath REGEX flags (http://www.w3.org/TR/xpath-functions/#flags)
+        # to Python's re flags
+        flagMap=dict([('i', re.IGNORECASE), ('s', re.DOTALL), ('m', re.MULTILINE)])
+        cFlag=reduce(pyop.or_, [flagMap.get(f,0) for f in flags])
+
+    return Literal(re.sub(unicode(pattern),text,replacement, cFlag))
+
+
+
+
+
+def Builtin_STRDT(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-strdt
+    """
+
+    return Literal(unicode(expr.arg1), datatype=expr.arg2)
+
+
+def Builtin_STRLANG(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-strlang
+    """
+
+    return Literal(unicode(expr.arg1), lang=unicode(expr.arg2))
+
+
+def Builtin_CONCAT(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-concat
+    """
+
+    # dt/lang passed on only if they all match
+
+    dt=set(x.datatype for x in expr.arg)
+    dt=dt.pop() if len(dt)==1 else None
+
+    lang=set(x.language for x in expr.arg)
+    lang=lang.pop() if len(lang)==1 else None
+
+    return Literal("".join(string(x) for x in expr.arg), datatype=dt, lang=lang)
+
+
+
+def _compatibleStrings(a,b):
+    string(a)
+    string(b)
+
+    if b.language and a.language!=b.language: 
+        raise SPARQLError('incompatible arguments to str functions')
+   
+    
+
+def Builtin_STRSTARTS(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-strstarts
+    """
+
+    a=expr.arg1
+    b=expr.arg2
+    _compatibleStrings(a,b)
+
+    return Literal( a.startswith(b), lang=a.language, datatype=a.datatype )
+
+def Builtin_STRENDS(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-strends
+    """
+
+    a=expr.arg1
+    b=expr.arg2
+    _compatibleStrings(a,b)
+
+    return Literal( a.endswith(b), lang=a.language, datatype=a.datatype)
+
+
+def Builtin_STRBEFORE(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-strbefore
+    """
+
+    a=expr.arg1
+    b=expr.arg2
+    _compatibleStrings(a,b)
+
+    i=a.find(b)
+
+    return Literal( a[:i], lang=a.language, datatype=a.datatype )
+
+def Builtin_STRAFTER(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-strafter
+    """
+
+    a=expr.arg1
+    b=expr.arg2
+    _compatibleStrings(a,b)
+
+    return Literal( a.startswith(b), lang=a.language, datatype=a.datatype )
+
+def Builtin_STRCONTAINS(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-strcontains
+    """
+
+    a=expr.arg1
+    b=expr.arg2
+    _compatibleStrings(a,b)
+
+    return Literal( b in a )
+
+
+
+
+def Builtin_SUBSTR(expr, ctx): 
+    """
+    http://www.w3.org/TR/sparql11-query/#func-substr
+    """
+
+    a=string(expr.arg)
+
+    start=numeric(expr.start)
+
+    length=expr.get("length") 
+    if length is not None: 
+        length=numeric(expr.start)+start
+
+    return Literal( a[start:length], lang=a.language, datatype=a.datatype )
 
 def Builtin_STRLEN(e, ctx):
-    l=e.arg
-    if not isinstance(l,Literal): raise SPARQLError('Can only get length of literal: %s'%l)
+    l=string(e.arg)
     
     return Literal(len(l))
 
 def Builtin_STR(e, ctx):
     arg=e.arg
-    #if not isinstance(l,Literal): raise SPARQLError('Can only get length of literal: %s'%l)
     
     return Literal(unicode(arg)) # plain literal
 
 
 def Builtin_LCASE(e, ctx):    
-    l=e.arg
-    if not isinstance(l,Literal): raise SPARQLError('Can only lower-case literal: %s'%l)
+    l=string(e.arg)
     
-    return Literal(l.tolower())
+    return Literal(l.lower(), datatype=l.datatype, lang=l.language)
 
 def Builtin_LANGMATCHES(e,ctx):
     """
@@ -172,11 +331,8 @@ def Builtin_LANGMATCHES(e,ctx):
 
     
     """
-    langTag=e.arg1
-    langRange=e.arg2
-
-    if not isinstance(langTag, Literal): raise SPARQLError('Expected a string/literal')
-    if not isinstance(langRange, Literal): raise SPARQLError('Expected a string/literal')
+    langTag=string(e.arg1)
+    langRange=string(e.arg2)
 
     if langTag=="": return Literal(False) # nothing matches empty!
 
@@ -185,10 +341,9 @@ def Builtin_LANGMATCHES(e,ctx):
     
 
 def Builtin_UCASE(e, ctx):    
-    l=e.arg
-    if not isinstance(l,Literal): raise SPARQLError('Can only upper-case literal: %s'%l)
+    l=string(e.arg)
     
-    return Literal(l.toupper())
+    return Literal(l.upper(), datatype=l.datatype, lang=l.language)
 
 
 def Builtin_LANG(e,ctx):
@@ -199,8 +354,7 @@ def Builtin_LANG(e,ctx):
     Returns the language tag of ltrl, if it has one. It returns "" if ltrl has no language tag. Note that the RDF data model does not include literals with an empty language tag.
     """
 
-    l=e.arg
-    if not isinstance(l,Literal): raise SPARQLError('Can only get language of literal: %s'%l)
+    l=literal(e.arg)
     return Literal(l.language or "")
 
 def Builtin_DATATYPE(e,ctx):
@@ -312,14 +466,16 @@ def MultiplicativeExpression(e,ctx):
     # we sometimes have nothing to do
     if other is None: 
         return expr
-
-    res=numeric(expr)
-    for op,e in zip(e.op, other): 
-        e=numeric(e)
-        if op=='*':
-            res*=e
-        else: 
-            res/=e
+    try: 
+        res=numeric(expr)
+        for op,e in zip(e.op, other): 
+            e=numeric(e)
+            if op=='*':
+                res*=e
+            else: 
+                res/=e
+    except ZeroDivisionError:
+        raise SPARQLError('divide by 0')
 
     return Literal(res)
 
@@ -473,6 +629,22 @@ def simplify(expr):
         #    expr['other']=simplify(expr.other)
 
     return expr
+
+def literal(s): 
+    if not isinstance(s, Literal): 
+        raise SPARQLError("Non-literal passes as string: %s"%s)
+    return s
+
+def string(s): 
+    """
+    Make sure the passed thing is a string literal
+    i.e. plain literal, xsd:string literal or lang-tagged literal
+    """
+    if not isinstance(s, Literal): 
+        raise SPARQLError("Non-literal passes as string: %s"%s)
+    if s.datatype and s.datatype!=XSD.string: 
+        raise SPARQLError("Non-string datatype-literal passes as string: %s"%s)
+    return s
 
 def numeric(expr): 
     """

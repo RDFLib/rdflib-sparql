@@ -25,3 +25,6 @@ http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#lang-ca
 http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-simple	literal equality
 http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-eq	literal equality
 http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-not-eq	literal equality
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg-sum-02	literal type-promotion arithmetic
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg-avg-02	literal type promotion arithmetic
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg-err-01	literal type-promotion arithmetic
