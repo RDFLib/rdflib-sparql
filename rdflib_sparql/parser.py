@@ -636,7 +636,7 @@ FunctionCall = Comp('Function', Param('iri', iri) + ArgList).setEvalFn(op.Functi
 
 
 # [120] BrackettedExpression ::= '(' Expression ')'
-BrackettedExpression = Suppress('(') + Group ( Expression ) + Suppress(')')
+BrackettedExpression = Suppress('(') + Expression + Suppress(')')
 
 # [119] PrimaryExpression ::= BrackettedExpression | BuiltInCall | iriOrFunction | RDFLiteral | NumericLiteral | BooleanLiteral | Var
 PrimaryExpression = BrackettedExpression | BuiltInCall | iriOrFunction | RDFLiteral | NumericLiteral | BooleanLiteral | Var

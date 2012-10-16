@@ -69,4 +69,8 @@ Sun Oct 14 19:21:00 CEST 2012
 # Implemented a bit of aggregation logic
 457 tests, 270 passed, 15 failed, 145 errors, 27 skipped (59.08% success)
 
+# Aggregation for group by / having
+457 tests, 273 passed, 12 failed, 145 errors, 27 skipped (59.74% success)
+
+
 

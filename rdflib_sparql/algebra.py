@@ -8,8 +8,6 @@ from rdflib_sparql.operators import and_, simplify as simplifyFilters
 
 from pyparsing import ParseResults
 
-from operator import iadd
-
 TrueFilter=Expr('TrueFilter', lambda _1, _2: Literal(True))
 
 
@@ -43,7 +41,7 @@ def Filter(expr, p):
     return CompValue('Filter', expr=expr, p=p)
 
 def Extend(p, expr, var): 
-    return CompValue('Extend', p=p, expr=simplifyFilters(expr), var=var)
+    return CompValue('Extend', p=p, expr=expr, var=var)
 
 def Project(p, PV): 
     return CompValue('Project', p=p, PV=PV)
@@ -63,9 +61,6 @@ def findFilters(parts):
 
     filters=[]
     
-    #if query.having:
-    #    filters=query.having.condition
-
     for p in parts:
         if p.name=='Filter':
             filters.append(p.expr)
@@ -106,7 +101,6 @@ def translateGroupGraphPattern(graphPattern):
     if not graphPattern.part: graphPattern.part=[] # empty { }
 
     filters=findFilters(graphPattern.part)
-    filters=simplifyFilters(filters) 
 
     g=[]
     for p in graphPattern.part: 
@@ -244,12 +238,51 @@ def _simplify(e):
     if isinstance(e,Expr):
         return simplifyFilters(e)
 
+def translateAggregates(q,M):
+    E=[]
+    A=[]
+
+    #import pdb; pdb.set_trace()
+
+    # collect/replace aggs in :
+    #    select expr as ?var
+    if q.evar:
+        es=[]
+        for e,v in zip(q.expr, q.evar): 
+            e=traverse(e,functools.partial(_sample,v=v))
+            e=traverse(e,functools.partial(_aggs,A=A))
+            es.append(e)
+        q.expr=es
+
+    # having clause
+    if traverse(q.having,_hasAggregate,False):
+        q.having=traverse(q.having, _sample)
+        traverse(q.having,functools.partial(_aggs,A=A))
+
+    # order by
+    if traverse(q.orderby,_hasAggregate,False):
+        q.orderby=traverse(q.orderby, _sample)
+        traverse(q.orderby,functools.partial(_aggs,A=A))
+
+
+    # sample all other select vars
+    # TODO: only allowed for vars in group-by?
+    if q.var: 
+        for v in q.var:
+            rv=Variable('__agg_%d__'%(len(A)+1))
+            A.append(CompValue('Aggregate_Sample', vars=v, res=rv))
+            E.append((rv, v))
+
+    return CompValue('AggregateJoin', A=A, p=M),E
+
+
 def translate(q, values=None): 
     """
     http://www.w3.org/TR/sparql11-query/#convertSolMod
 
     """
 
+    #import pdb; pdb.set_trace()
     _traverse(q, _simplify)
 
     # all query types have a where part
@@ -266,47 +299,16 @@ def translate(q, values=None):
         M=Group(p=M)
         aggregate=True
 
-    E=[] # aggregates
     
     if aggregate:
-        A=[]
-        
-        # collect/replace aggs in :
-        # select expr as ?var
-        if q.evar:
-
-            for e,v in zip(q.expr, q.evar): 
-                e=traverse(e,functools.partial(_sample,v=v))
-                traverse(e,functools.partial(_aggs,A=A))
-
-        import pdb; pdb.set_trace()
-
-        # having clause
-        if traverse(q.having,_hasAggregate,False):
-            q.having=traverse(q.having, _sample)
-            traverse(q.having,functools.partial(_aggs,A=A))
-
-        # order by
-        if traverse(q.orderby,_hasAggregate,False):
-            q.orderby=traverse(q.orderby, _sample)
-            traverse(q.orderby,functools.partial(_aggs,A=A))
-
-        
-        # sample all other select vars
-        # TODO: only allowed for vars in group-by?
-        if q.var: 
-            for v in q.var:
-                rv=Variable('__agg_%d__'%(len(A)+1))
-                A.append(CompValue('Aggregate_Sample', vars=v, res=rv))
-                E.append((rv, v))
-    
-        M=CompValue('AggregateJoin', A=A, p=M)
-        
+        M,E=translateAggregates(q,M)
+    else: 
+        E=[]
 
 
     # HAVING
     if q.having: 
-        M=Filter(expr=simplifyFilters(and_(q.having.condition)), p=M)
+        M=Filter(expr=and_(*q.having.condition), p=M)
 
     # VALUES
     if values:
@@ -332,7 +334,7 @@ def translate(q, values=None):
 
     # ORDER BY
     if q.orderby:
-        M=OrderBy(M, [CompValue('OrderCondition', expr=simplifyFilters(c.expr), order=c.order) for c in q.orderby.condition])
+        M=OrderBy(M, [CompValue('OrderCondition', expr=c.expr, order=c.order) for c in q.orderby.condition])
 
     # PROJECT
     M=Project(M, PV)
@@ -374,7 +376,7 @@ def translateQuery(q):
     else: 
         res=q[0],CompValue(q[1].name, p=P, datasetClause=datasetClause)
 
-    res=simplify(res)
+    #res=simplify(res)
 
     return res
     
