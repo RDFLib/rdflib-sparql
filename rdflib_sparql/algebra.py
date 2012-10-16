@@ -1,9 +1,12 @@
 
+import functools
 
 from rdflib import Literal, Variable
 
 from rdflib_sparql.parserutils import CompValue, Expr
 from rdflib_sparql.operators import and_, simplify as simplifyFilters
+
+from pyparsing import ParseResults
 
 from operator import iadd
 
@@ -138,7 +141,7 @@ def translateGroupGraphPattern(graphPattern):
         elif p.name=='Filter': 
             pass # already collected above
         else: 
-            raise Exception('Unknown part in GroupGraphPattern: '+type(p)+" - "+p.name)
+            raise Exception('Unknown part in GroupGraphPattern: %s - %s'%(type(p), p.name))
         
             
     if filters: 
@@ -146,66 +149,108 @@ def translateGroupGraphPattern(graphPattern):
         
     return G
     
-def _hasAggregate(x):
-    if x is None: return False
-    if isinstance(x, CompValue):
-        if x.name.startswith('Aggregate_'): 
-            return True
-        return any(_hasAggregate(v) for v in x.values())
-    return False
-
-def _aggs(e,A):
-
-    for k,val in e.iteritems(): 
-        if isinstance(val, CompValue): 
-            _aggs(val,A)
-            if val.name.startswith('Aggregate_'):             
-                A.append(val)
-                aggvar=Variable('__agg_%d__'%len(A))
-                e[k]=aggvar
-                val["res"]=aggvar
 
 
-            
+ 
 
-def _findVars(x): 
-    if x is None: return []
-    if isinstance(x, Variable): return set([x])    
+class StopTraversal(Exception): 
+    def __init__(self, rv): 
+        self.rv=rv
 
-    res=set()
-        
-    if isinstance(x, CompValue):
-        for y in x.values(): 
-            res.update(_findVars(y))
 
-    if isinstance(x, (tuple,list)):
-        for y in x:
-            res.update(_findVars(y))
-
-    return res
-    
-    
-def _sample(e,v): 
+def _traverse(e,visit):
     """
-     For each unaggregated variable V in expr
-      Replace V with Sample(V)
-      """
+    Traverse a parse-tree, visit each node    
+
+    if visit functions return a value, replace current node
+    and do not recurse further
+    """
+    _e=visit(e)
+    if _e: return _e 
     
-    for k,val in e.iteritems(): 
-        if isinstance(val, Variable) and v!=val: 
-            e[k]=CompValue('Aggregate_Sample', vars=val)
-        elif isinstance(val, CompValue) and not val.name.startswith('Aggreg'): 
-            e[k]=_sample(val, v)
+    
+    if e is None: return None
+
+    if isinstance(e, (list, ParseResults)):
+        return [_traverse(x,visit) for x in e]
+    elif isinstance(e, tuple):
+        return tuple([_traverse(x,visit) for x in e])
+    
+    elif isinstance(e, CompValue): 
+        for k,val in e.iteritems():
+            e[k]=_traverse(val, visit)
 
     return e
 
+def traverse(tree,visit,complete=None):
+    """
+    Traverse tree, visit each node with visit function
+    visit function may raise StopTraversal to stop traversal
+    if complete!=None, it is returned on complete traversal, 
+    otherwise the transformed tree is returned
+    """
+    try:
+        r=_traverse(tree,visit)
+        if complete is not None: return complete
+        return r
+    except StopTraversal,st:
+        return st.rv
+
+def _hasAggregate(x):
+    """
+    Traverse parse(sub)Tree
+    return true if any aggregates are used
+    """
+
+    if isinstance(x, CompValue):
+        if x.name.startswith('Aggregate_'): 
+            raise StopTraversal(True)
+
+
+
+def _aggs(e,A):
+    """
+    Collect Aggregates in A
+    replaces aggregates with variable references
+    """
     
+    #TODO: nested Aggregates?
+
+    if isinstance(e, CompValue) and e.name.startswith('Aggregate_'):
+        A.append(e)
+        aggvar=Variable('__agg_%d__'%len(A))
+        e["res"]=aggvar
+        return aggvar
+
+            
+def _findVars(x, res):
+    """
+    Find all variables in a tree
+    """
+    if isinstance(x, Variable): res.add(x)
+    
+
+def _sample(e,v=None):
+    """
+    For each unaggregated variable V in expr
+    Replace V with Sample(V)
+    """
+    if isinstance(e, CompValue) and e.name.startswith("Aggregate_"):
+        return e # do not replace vars in aggregates
+    if isinstance(e, Variable) and v!=e: 
+        return CompValue('Aggregate_Sample', vars=e)
+
+def _simplify(e):
+    if isinstance(e,Expr):
+        return simplifyFilters(e)
 
 def translate(q, values=None): 
     """
     http://www.w3.org/TR/sparql11-query/#convertSolMod
 
     """
+
+    _traverse(q, _simplify)
 
     # all query types have a where part
     M=translateGroupGraphPattern(q.where)
@@ -214,27 +259,41 @@ def translate(q, values=None):
     if q.groupby: 
         M=Group(p=M, expr=q.groupby.condition)
         aggregate=True
-    elif _hasAggregate(q.having) or \
-            _hasAggregate(q.orderby) or \
-            any(_hasAggregate(x) for x in q.expr or []):
+    elif traverse(q.having,_hasAggregate,False) or \
+            traverse(q.orderby,_hasAggregate,False) or \
+            any(traverse(x, _hasAggregate,False) for x in q.expr or []):
+        # if any aggregate is used, implicit group by
         M=Group(p=M)
         aggregate=True
 
     E=[] # aggregates
-
+    
     if aggregate:
         A=[]
+        
+        # collect/replace aggs in :
+        # select expr as ?var
         if q.evar:
 
             for e,v in zip(q.expr, q.evar): 
-                e=_sample(e,v)
-                _aggs(e,A)
+                e=traverse(e,functools.partial(_sample,v=v))
+                traverse(e,functools.partial(_aggs,A=A))
 
-            # TODO: aggs in having, order by
+        import pdb; pdb.set_trace()
 
-            # TODO: "For each variable V appearing outside of an aggregate" 
-        # ... ???
-    
+        # having clause
+        if traverse(q.having,_hasAggregate,False):
+            q.having=traverse(q.having, _sample)
+            traverse(q.having,functools.partial(_aggs,A=A))
+
+        # order by
+        if traverse(q.orderby,_hasAggregate,False):
+            q.orderby=traverse(q.orderby, _sample)
+            traverse(q.orderby,functools.partial(_aggs,A=A))
+
+        
+        # sample all other select vars
+        # TODO: only allowed for vars in group-by?
         if q.var: 
             for v in q.var:
                 rv=Variable('__agg_%d__'%(len(A)+1))
@@ -254,7 +313,8 @@ def translate(q, values=None):
         M=Join(p1=M, p2=ToMultiSet(values))
 
     # TODO: Var scope test
-    VS=_findVars(M)
+    VS=set()
+    traverse(M, functools.partial(_findVars, res=VS))
 
     PV=set()
     if not q.var and not q.expr: 
