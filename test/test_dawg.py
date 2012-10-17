@@ -1,7 +1,9 @@
 import collections
 import os.path
+import datetime
+import isodate
 
-from rdflib import ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef, BNode
+from rdflib import ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef, BNode, Literal
 from rdflib.query import Result
 from rdflib.compare import isomorphic
 
@@ -31,6 +33,9 @@ DETAILEDASSERT=True
 MF=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#')
 QT=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-query#')
 DAWG=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-dawg#')
+DOAP = Namespace('http://usefulinc.com/ns/doap#')
+FOAF = Namespace('http://xmlns.com/foaf/0.1/')
+EARL=Namespace("http://www.w3.org/ns/earl#")
 
 NAME=None
 
@@ -41,7 +46,47 @@ failed_tests=[]
 error_tests=[]
 
 
+EARL_REPORT=Graph()
+
+rdflib_sparql=URIRef('https://github.com/gromgull/rdflib-sparql')
+
+EARL_REPORT.add((rdflib_sparql, DOAP.homepage, rdflib_sparql))
+EARL_REPORT.add((rdflib_sparql, DOAP.name, Literal("rdflib_sparql")))
+EARL_REPORT.add((rdflib_sparql, RDF.type, DOAP.Project))
+
+me=URIRef('http://gromgull.net/me')
+EARL_REPORT.add((me, RDF.type, FOAF.Person))
+EARL_REPORT.add((me, FOAF.homepage, URIRef("http://gromgull.net")))
+EARL_REPORT.add((me, FOAF.name, Literal("Gunnar Aastrand Grimnes")))
+
+
+
+
+
 def bindingsCompatible(a,b):
+
+    """
+
+    Are two binding-sets compatible. 
+
+    From the spec: http://www.w3.org/2009/sparql/docs/tests/#queryevaltests
+
+    A SPARQL implementation passes a query evaluation test if the
+    graph produced by evaluating the query against the RDF dataset
+    (and encoding in the DAWG result set vocabulary, if necessary) is
+    equivalent [RDF-CONCEPTS] to the graph named in the result (after
+    encoding in the DAWG result set vocabulary, if necessary). Note
+    that, solution order only is considered relevant, if the result is
+    expressed in the test suite in the DAWG result set vocabulary,
+    with explicit rs:index triples; otherwise solution order is
+    considered irrelevant for passing. Equivalence can be tested by
+    checking that the graphs are isomorphic and have identical IRI and
+    literal nodes. Note that testing whether two result sets are
+    isomorphic is simpler than full graph isomorphism. Iterating over
+    rows in one set, finding a match with the other set, removing this
+    pair, then making sure all rows are accounted for, achieves the
+    same effect.
+    """
 
     def rowCompatible(x,y):
         m={}
@@ -76,6 +121,9 @@ def bindingsCompatible(a,b):
 
 
 def pp_binding(solutions): 
+    """
+    Pretty print a single binding - for less eye-strain when debugging
+    """
     return "\n["+",\n\t".join("{" + ", ".join("%s:%s"%(x[0], x[1].n3()) for x in bindings.items()) + "}" for bindings in solutions)+"]\n"
 
 def do_test_single(t):
@@ -275,6 +323,21 @@ def test_dawg():
         for t in read_manifest("test/DAWG/data-sparql11/manifest-all.ttl"):
             yield do_test_single, t
 
+def earl(test, res, info=None): 
+    a=BNode()
+    EARL_REPORT.add((a, RDF.type, EARL.Assertion))
+    EARL_REPORT.add((a, EARL.assertedBy, me))
+    EARL_REPORT.add((a, EARL.test, test))
+    EARL_REPORT.add((a, EARL.subject, rdflib_sparql))
+
+    r=BNode()
+    EARL_REPORT.add((a, EARL.result, r))
+    EARL_REPORT.add((r, RDF.type, EARL.TestResult))
+
+    EARL_REPORT.add((r, EARL.outcome, EARL[res]))
+    if info: 
+        EARL_REPORT.add((r, EARL.info, Literal(info)))
+
 
 if __name__=='__main__':
 
@@ -296,17 +359,20 @@ if __name__=='__main__':
         if NAME and not str(t[0]).startswith(NAME): continue
         i+=1
         if t[0] in skiptests:
+            earl(t[0], "untested")
             print "skipping %s - %s"%(t[0],skiptests[t[0]])
             skip+=1
             continue
         try: 
             f(t)
+            earl(t[0], "passed")
             success+=1
         except KeyboardInterrupt: 
             raise
         except AssertionError:
-            pass
+            earl(t[0], "failed")
         except: 
+            earl(t[0], "failed", "error")
             import traceback
             traceback.print_exc()
 
@@ -347,3 +413,8 @@ if __name__=='__main__':
     print "\n%d tests, %d passed, %d failed, %d errors, %d skipped (%.2f%% success)"%(i, success, f,e, skip, 100.*success/i)
     print "Took %.2fs"%(time.time()-start)
 
+
+    earl_report='test_reports/earl_%s.ttl'%isodate.datetime_isoformat(datetime.datetime.utcnow())
+
+    EARL_REPORT.serialize(earl_report, format='n3')
+    print "Wrote EARL-report to '%s'"%earl_report
