@@ -488,10 +488,10 @@ SubstringExpression = Comp('Builtin_SUBSTR', Keyword('SUBSTR') + '(' + Param('ar
 StrReplaceExpression = Comp('Builtin_REPLACE', Keyword('REPLACE') + '(' + Param('arg', Expression) + ',' + Param('pattern', Expression) + ',' + Param('replacement', Expression) + Optional( ',' + Param('flags',Expression) ) + ')' ).setEvalFn(op.Builtin_REPLACE)
 
 # [125] ExistsFunc ::= 'EXISTS' GroupGraphPattern
-ExistsFunc = Comp('Builtin_EXISTS', Keyword('EXISTS') + Param('graph', GroupGraphPattern))
+ExistsFunc = Comp('Builtin_EXISTS', Keyword('EXISTS') + Param('graph', GroupGraphPattern)).setEvalFn(op.Builtin_EXISTS)
 
 # [126] NotExistsFunc ::= 'NOT' 'EXISTS' GroupGraphPattern
-NotExistsFunc = Comp('Builtin_NOTEXISTS', Keyword('NOT') + Keyword('EXISTS') + Param('graph', GroupGraphPattern))
+NotExistsFunc = Comp('Builtin_NOTEXISTS', Keyword('NOT') + Keyword('EXISTS') + Param('graph', GroupGraphPattern)).setEvalFn(op.Builtin_EXISTS)
 
 
 # [127] Aggregate ::= 'COUNT' '(' 'DISTINCT'? ( '*' | Expression ) ')'
@@ -777,17 +777,17 @@ Update1 = Load | Clear | Drop | Add | Move | Copy | Create | InsertData | Delete
 
 
 # [63] InlineDataOneVar ::= Var '{' ZeroOrMore(DataBlockValue) '}'
-InlineDataOneVar = Var + '{' + ZeroOrMore(DataBlockValue) + '}'
+InlineDataOneVar = ParamList('var', Var) + '{' + ZeroOrMore(ParamList('value', DataBlockValue)) + '}'
 
 # [64] InlineDataFull ::= ( NIL | '(' ZeroOrMore(Var) ')' ) '{' ( '(' ZeroOrMore(DataBlockValue) ')' | NIL )* '}'
-InlineDataFull = ( NIL | '(' + ZeroOrMore(Var) + ')' ) + '{' + ZeroOrMore( '(' + ZeroOrMore(DataBlockValue) + ')' | NIL ) + '}'
+InlineDataFull = ( NIL | '(' + ZeroOrMore(ParamList('var', Var)) + ')' ) + '{' + ZeroOrMore( ParamList('value', Group ( Suppress('(') + ZeroOrMore(DataBlockValue) + Suppress(')') | NIL ) ) ) + '}'
 
 # [62] DataBlock ::= InlineDataOneVar | InlineDataFull
 DataBlock = InlineDataOneVar | InlineDataFull
 
 
 # [28] ValuesClause ::= ( 'VALUES' DataBlock )?
-ValuesClause = Optional( Keyword('VALUES') + DataBlock )
+ValuesClause = Optional( Param('valuesClause', Comp('ValuesClause', Keyword('VALUES') + DataBlock )))
 
 
 
@@ -817,7 +817,7 @@ ServiceGraphPattern = Comp('ServiceGraphPattern', Keyword('SERVICE') + _Silent +
 Bind = Comp ('Bind', Keyword('BIND') + '(' + Param('expr', Expression) + Keyword('AS') + Param('var', Var) + ')' )
 
 # [61] InlineData ::= 'VALUES' DataBlock
-InlineData = Comp('InlineData', Keyword('VALUES') + Param('data', DataBlock))
+InlineData = Comp('InlineData', Keyword('VALUES') + DataBlock)
 
 # [56] GraphPatternNotTriples ::= GroupOrUnionGraphPattern | OptionalGraphPattern | MinusGraphPattern | GraphGraphPattern | ServiceGraphPattern | Filter | Bind | InlineData
 GraphPatternNotTriples = GroupOrUnionGraphPattern | OptionalGraphPattern | MinusGraphPattern | GraphGraphPattern | ServiceGraphPattern | Filter | Bind | InlineData
@@ -869,16 +869,16 @@ SubSelect = Comp ('SubSelect', SelectClause + WhereClause + SolutionModifier + V
 GroupGraphPattern << ( Suppress('{') + ( SubSelect | GroupGraphPatternSub ) + Suppress('}') )
 
 # [7] SelectQuery ::= SelectClause DatasetClause* WhereClause SolutionModifier
-SelectQuery = Comp('SelectQuery', SelectClause + ZeroOrMore(ParamList('datasetClause', DatasetClause) ) + WhereClause + SolutionModifier)
+SelectQuery = Comp('SelectQuery', SelectClause + ZeroOrMore(ParamList('datasetClause', DatasetClause) ) + WhereClause + SolutionModifier + ValuesClause)
 
 # [10] ConstructQuery ::= 'CONSTRUCT' ( ConstructTemplate DatasetClause* WhereClause SolutionModifier | DatasetClause* 'WHERE' '{' TriplesTemplate? '}' SolutionModifier )
-ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( ConstructTemplate  + Param('datasetClause', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(TriplesTemplate) + '}' + SolutionModifier ) )
+ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( ConstructTemplate  + Param('datasetClause', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier + ValuesClause | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(Param('where', Comp('TriplesBlock', TriplesTemplate))) + '}' + SolutionModifier + ValuesClause ) )
 
 # [12] AskQuery ::= 'ASK' DatasetClause* WhereClause SolutionModifier
-AskQuery = Comp('AskQuery', Keyword('ASK') + Param('datasetClause', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier)
+AskQuery = Comp('AskQuery', Keyword('ASK') + Param('datasetClause', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier + ValuesClause)
 
 # [11] DescribeQuery ::= 'DESCRIBE' ( VarOrIri+ | '*' ) DatasetClause* WhereClause? SolutionModifier
-DescribeQuery = Comp('DescribeQuery', Keyword('DESCRIBE') + (OneOrMore(ParamList('var',VarOrIri)) | '*' ) + Param('datasetClause', ZeroOrMore(DatasetClause)) + Optional(WhereClause) + SolutionModifier)
+DescribeQuery = Comp('DescribeQuery', Keyword('DESCRIBE') + (OneOrMore(ParamList('var',VarOrIri)) | '*' ) + Param('datasetClause', ZeroOrMore(DatasetClause)) + Optional(WhereClause) + SolutionModifier + ValuesClause)
 
 # [29] Update ::= Prologue ( Update1 ( ';' Update )? )?
 Update = Forward()
@@ -888,7 +888,8 @@ Update << ( Prologue + Optional( Update1 + Optional( ';' + Update ) ) )
 # [2] Query ::= Prologue
 # ( SelectQuery | ConstructQuery | DescribeQuery | AskQuery )
 # ValuesClause
-Query = Prologue + ( SelectQuery | ConstructQuery | DescribeQuery | AskQuery ) + ValuesClause
+# NOTE: ValuesClause was moved to invidual queries
+Query = Prologue + ( SelectQuery | ConstructQuery | DescribeQuery | AskQuery ) 
 
 # [3] UpdateUnit ::= Update
 UpdateUnit = Update
@@ -921,7 +922,7 @@ def expandUnicodeEscapes(q):
 def parseQuery(q): 
     if hasattr(q,'read'): q=q.read()
     q=expandUnicodeEscapes(q)
-    return Query.parseString(q)
+    return Query.parseString(q, parseAll=True)
 
 
 if __name__=='__main__':

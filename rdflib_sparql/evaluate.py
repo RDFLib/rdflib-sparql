@@ -141,7 +141,14 @@ def evalGraph(ctx, part):
             yield x
         
 def evalMultiset(ctx, part): 
-    #import pdb; pdb.set_trace()
+
+    # TODO: Once prefix/pname conversion is moved to algebra translation stage this can go
+    def _c(d): 
+        return [ (k, value(ctx, v)) for k,v in d.iteritems() if v!='UNDEF' ]
+
+    if part.p.name=='values': 
+        return [ FrozenBindings(ctx, _c(x)) for x in part.p.res ] 
+
     return evalPart(ctx, part.p)
 
 def evalPart(ctx, part):
@@ -186,6 +193,10 @@ def evalPart(ctx, part):
         return evalAskQuery(ctx,part)
     elif part.name=='ConstructQuery':
         return evalConstructQuery(ctx,part)
+
+    elif part.name=='ServiceGraphPattern':
+        raise Exception('ServiceGraphPattern not implemented')
+
     elif part.name=='DescribeQuery':
         raise Exception('DESCRIBE not implemented')
 

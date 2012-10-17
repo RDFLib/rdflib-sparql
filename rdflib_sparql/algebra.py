@@ -57,13 +57,25 @@ def triples(l):
     return [(l[x],l[x+1],l[x+2]) for x in range(0,len(l),3)]
 
 
+def convertExists(e):
+
+    def _c(n): 
+        if isinstance(n, CompValue):
+            if n.name in ('Builtin_EXISTS', 'Builtin_NOTEXISTS'):
+                n.graph=translateGroupGraphPattern(n.graph)
+
+
+    e=traverse(e, visitPost=_c)
+
+    return e
+
 def findFilters(parts):
 
     filters=[]
     
     for p in parts:
         if p.name=='Filter':
-            filters.append(p.expr)
+            filters.append(convertExists(p.expr))
 
     if filters:
         return and_(*filters)
@@ -88,7 +100,7 @@ def translateGraphGraphPattern(graphPattern):
     return Graph(graphPattern.term, translateGroupGraphPattern(graphPattern.graph))
 
 def translateInlineData(graphPattern): 
-    raise Exception("NotYetImplemented!")
+    return ToMultiSet(translateValues(graphPattern))
 
 def translateGroupGraphPattern(graphPattern):     
     """
@@ -110,7 +122,9 @@ def translateGroupGraphPattern(graphPattern):
                 g.append(BGP())
             g[-1]["triples"]+=triples(p.triples)
         elif p.name=='Bind': 
-            g[-1]=Extend(g[-1] if g else None, p.expr, p.var)
+            if not g:
+                g.append(BGP())
+            g[-1]=Extend(g[-1], p.expr, p.var)
         else: 
             g.append(p)
 
@@ -280,8 +294,24 @@ def translateAggregates(q,M):
 
     return CompValue('AggregateJoin', A=A, p=M),E
 
+def translateValues(v): 
+    # if len(v.var)!=len(v.value):
+    #     raise Exception("Unmatched vars and values in ValueClause: "+str(v))
+    
+    res=[]
+    if not v.var: return res
+    if not v.value: return res
+    if not isinstance(v.value[0], list):
+        
+        for val in v.value: 
+            res.append({ v.var[0]: val })
+    else: 
+        for vals in v.value: 
+            res.append(dict(zip(v.var, vals)))
+            
+    return CompValue('values', res=res)
 
-def translate(q, values=None): 
+def translate(q): 
     """
     http://www.w3.org/TR/sparql11-query/#convertSolMod
 
@@ -324,8 +354,8 @@ def translate(q, values=None):
         M=Filter(expr=and_(*q.having.condition), p=M)
 
     # VALUES
-    if values:
-        M=Join(p1=M, p2=ToMultiSet(values))
+    if q.valuesClause:
+        M=Join(p1=M, p2=ToMultiSet(translateValues(q.valuesClause)))
 
     # TODO: Var scope test
     VS=set()
@@ -387,10 +417,15 @@ def translateQuery(q):
     (prologue, selectquery, [values])
     """
 
-    P,PV=translate(q[1], q[2] if len(q)>2 else None)    
+    P,PV=translate(q[1])
     datasetClause=q[1].datasetClause
     if q[1].name=='ConstructQuery': 
-        res=q[0],CompValue(q[1].name, p=P, template=triples(q[1].template), datasetClause=datasetClause)
+
+        template=triples(q[1].template) if q[1].template else None
+
+        res=q[0],CompValue(q[1].name, p=P, 
+                           template=template,
+                           datasetClause=datasetClause)
     else: 
         res=q[0],CompValue(q[1].name, p=P, datasetClause=datasetClause, PV=PV)
 

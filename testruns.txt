@@ -1,0 +1,18 @@
+2012-10-17T18:18:14
+532 tests, 345 passed, 58 failed, 99 errors, 30 skipped (64.85% success)
+
+2012-10-17T18:45:31
+532 tests, 347 passed, 58 failed, 97 errors, 30 skipped (65.23% success)
+
+2012-10-17T18:49:14
+532 tests, 354 passed, 60 failed, 88 errors, 30 skipped (66.54% success)
+
+2012-10-17T19:00:05
+532 tests, 373 passed, 45 failed, 84 errors, 30 skipped (70.11% success)
+
+2012-10-17T19:25:31
+532 tests, 388 passed, 44 failed, 70 errors, 30 skipped (72.93% success)
+
+2012-10-17T21:02:53
+532 tests, 398 passed, 43 failed, 61 errors, 30 skipped (74.81% success)
+

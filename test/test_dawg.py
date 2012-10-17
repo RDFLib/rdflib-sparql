@@ -24,6 +24,9 @@ DEBUG_FAIL=False
 DEBUG_ERROR=True
 DEBUG_ERROR=False
 
+SPARQL10Tests=True
+SPARQL10Tests=False
+
 SPARQL11Tests=True
 #SPARQL11Tests=False
 
@@ -61,7 +64,9 @@ EARL_REPORT.add((me, FOAF.name, Literal("Gunnar Aastrand Grimnes")))
 
 
 
-
+def _fmt(f):
+    if f.endswith(".rdf"): return "xml"
+    return "turtle"
 
 def bindingsCompatible(a,b):
 
@@ -138,13 +143,13 @@ def do_test_single(t):
     try: 
         g=ConjunctiveGraph()
         if data:
-            g.default_context.load(data, format='turtle')
+            g.default_context.load(data, format=_fmt(data))
 
         if graphdata:
             for x in graphdata:
                 g.load(x, 
 #                       publicID=URIRef('http://ba.se/'+os.path.basename(x)),
-                       format='turtle')
+                       format=_fmt(x))
 
 
         s=SPARQLProcessor(g)
@@ -175,6 +180,8 @@ def do_test_single(t):
             resg=Graph()
             resg.load(resfile, publicID=resfile)
             res=RDFResultParser().parse(resg)            
+        elif resfile.endswith('srj'):
+            res=Result.parse(file(resfile[7:]), format='json')
         else:
             res=Result.parse(file(resfile[7:]),format='xml') 
 
@@ -225,6 +232,13 @@ def do_test_single(t):
             print uri
             print name
             print comment
+
+            if not resfile: 
+                if syntax: 
+                    print "Positive syntax test"
+                else: 
+                    print "Negative syntax test"
+
             if data: 
                 print "----------------- DATA --------------------"
                 print ">>>", data
@@ -360,7 +374,7 @@ if __name__=='__main__':
         if NAME and not str(t[0]).startswith(NAME): continue
         i+=1
         if t[0] in skiptests:
-            earl(t[0], "untested")
+            earl(t[0], "untested",skiptests[t[0]])
             print "skipping %s - %s"%(t[0],skiptests[t[0]])
             skip+=1
             continue
@@ -376,6 +390,7 @@ if __name__=='__main__':
             earl(t[0], "failed", "error")
             import traceback
             traceback.print_exc()
+            sys.stderr.write("%s\n"%t[0])
 
 
     print "\n----------------------------------------------------\n"
@@ -415,8 +430,17 @@ if __name__=='__main__':
     print "Took %.2fs"%(time.time()-start)
 
 
-    earl_report='test_reports/earl_%s.ttl'%isodate.datetime_isoformat(datetime.datetime.utcnow())
 
-    EARL_REPORT.serialize(earl_report, format='n3')
-    EARL_REPORT.serialize('test_reports/earl_latest.ttl', format='n3')
-    print "Wrote EARL-report to '%s'"%earl_report
+    if not NAME: 
+
+        now=isodate.datetime_isoformat(datetime.datetime.utcnow())
+
+        tf=file("testruns.txt","a")
+        tf.write("%s\n%d tests, %d passed, %d failed, %d errors, %d skipped (%.2f%% success)\n\n"%(now, i, success, f,e, skip, 100.*success/i))
+        tf.close()
+             
+        earl_report='test_reports/earl_%s.ttl'%now
+
+        EARL_REPORT.serialize(earl_report, format='n3')
+        EARL_REPORT.serialize('test_reports/earl_latest.ttl', format='n3')
+        print "Wrote EARL-report to '%s'"%earl_report

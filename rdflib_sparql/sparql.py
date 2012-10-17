@@ -134,6 +134,15 @@ class FrozenBindings(collections.Mapping):
     def absolutize(self, iri): 
         return self.ctx.absolutize(iri)
 
+    def thaw(self): 
+        """
+        Create a new read/write query context from this solution
+        """
+        c=self.ctx.clone()
+        c.push()
+        c.bindings.update(self)
+        return c
+
 class QueryContext(object): 
 
     def __init__(self, graph=None): 

@@ -15,7 +15,8 @@ from rdflib.term import Node
 
 from pyparsing import ParseResults
 
-from rdflib_sparql.sparql import SPARQLError, NotBoundError, SPARQLTypeError
+from rdflib_sparql.sparql import SPARQLError, NotBoundError, SPARQLTypeError, QueryContext
+
 
 """ 
 This contains evaluation functions for expressions 
@@ -379,6 +380,17 @@ def Builtin_BOUND(e, ctx):
     
     return Literal(not isinstance(n, Variable))
 
+def Builtin_EXISTS(e, ctx): 
+    # damn...
+    from rdflib_sparql.evaluate import evalPart
+
+    exists=e.name=='Builtin_EXISTS'
+    
+    ctx=ctx.thaw() 
+    for x in evalPart(ctx,e.graph):
+        return Literal(exists)
+    return Literal(not exists) 
+
 def Function(e, ctx):
     """
     Custom functions (and casts!)
@@ -604,6 +616,9 @@ def ConditionalOrExpression(e, ctx):
     return Literal(False)
     
 
+def not_(arg): 
+    return Expr('UnaryNot', UnaryNot, expr=arg)
+
 def and_(*args): 
     if len(args)==1: 
         return args[0]
@@ -629,6 +644,9 @@ def simplify(expr):
         #    expr['other']=simplify(expr.other)
 
     return expr
+
+
+
 
 def literal(s): 
     if not isinstance(s, Literal): 
