@@ -281,8 +281,9 @@ def read_manifest(f):
 
         for col in g.objects(m,MF.entries):
             for e in g.items(col):
-
-                if not (e,DAWG.approval,DAWG.Approved) in g: continue
+                
+                if not ((e,DAWG.approval,DAWG.Approved) in g or\
+                            (e, DAWG.approval, DAWG.NotClassified) in g): continue
                 
                 t=g.value(e, RDF.type)
                 if t in (MF.PositiveUpdateSyntaxTest11, MF.NegativeUpdateSyntaxTest11, MF.UpdateEvaluationTest, MF.ProtocolTest): continue # skip update tests
@@ -417,4 +418,5 @@ if __name__=='__main__':
     earl_report='test_reports/earl_%s.ttl'%isodate.datetime_isoformat(datetime.datetime.utcnow())
 
     EARL_REPORT.serialize(earl_report, format='n3')
+    EARL_REPORT.serialize('test_reports/earl_latest.ttl', format='n3')
     print "Wrote EARL-report to '%s'"%earl_report
