@@ -241,6 +241,9 @@ def _findVars(x, res):
     Find all variables in a tree
     """
     if isinstance(x, Variable): res.add(x)
+    if isinstance(x, CompValue) and x.name=="Bind": 
+        res.add(x.var)
+        return x # stop recursion and finding vars in the expr
     
 
 def _sample(e,v=None):
@@ -320,6 +323,10 @@ def translate(q):
     #import pdb; pdb.set_trace()
     _traverse(q, _simplifyFilters)
 
+    # TODO: Var scope test
+    VS=set()
+    traverse(q.where, functools.partial(_findVars, res=VS))
+
     # all query types have a where part
     M=translateGroupGraphPattern(q.where)
 
@@ -356,10 +363,6 @@ def translate(q):
     # VALUES
     if q.valuesClause:
         M=Join(p1=M, p2=ToMultiSet(translateValues(q.valuesClause)))
-
-    # TODO: Var scope test
-    VS=set()
-    traverse(M, functools.partial(_findVars, res=VS))
 
     PV=set()
     if not q.var and not q.expr: 

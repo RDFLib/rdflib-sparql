@@ -1,5 +1,5 @@
 
-from rdflib import Variable
+from rdflib import Variable, Literal
 
 from rdflib_sparql.operators import EBV
 from rdflib_sparql.parserutils import Expr, CompValue
@@ -59,6 +59,8 @@ def _ebv(expr, ctx):
     return False
 
 def _eval(expr, ctx):
+    if isinstance(expr, Literal): 
+        return expr
     if isinstance(expr, Expr):         
         return expr.eval(ctx)
     elif isinstance(expr, Variable): 

@@ -441,7 +441,7 @@ TriplesSameSubject.setParseAction(expandTriples)
 
 # [52] TriplesTemplate ::= TriplesSameSubject ( '.' Optional(TriplesTemplate) )?
 TriplesTemplate = Forward()
-TriplesTemplate << ( TriplesSameSubject + Optional( Suppress('.') + Optional(TriplesTemplate) ) )
+TriplesTemplate << ( ParamList('triples', TriplesSameSubject) + Optional( Suppress('.') + Optional(TriplesTemplate) ) )
 
 # [51] QuadsNotTriples ::= 'GRAPH' VarOrIri '{' Optional(TriplesTemplate) '}'
 QuadsNotTriples = Keyword('GRAPH') + VarOrIri + Group ( '{' +  Optional(TriplesTemplate)  + '}' )
@@ -872,7 +872,9 @@ GroupGraphPattern << ( Suppress('{') + ( SubSelect | GroupGraphPatternSub ) + Su
 SelectQuery = Comp('SelectQuery', SelectClause + ZeroOrMore(ParamList('datasetClause', DatasetClause) ) + WhereClause + SolutionModifier + ValuesClause)
 
 # [10] ConstructQuery ::= 'CONSTRUCT' ( ConstructTemplate DatasetClause* WhereClause SolutionModifier | DatasetClause* 'WHERE' '{' TriplesTemplate? '}' SolutionModifier )
-ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( ConstructTemplate  + Param('datasetClause', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier + ValuesClause | ZeroOrMore(DatasetClause) + Keyword('WHERE') + '{' + Optional(Param('where', Comp('TriplesBlock', TriplesTemplate))) + '}' + SolutionModifier + ValuesClause ) )
+# NOTE: The CONSTRUCT WHERE alternative has unnescessarily many Comp/Param pairs
+# to allow it to through the same algebra translation process
+ConstructQuery = Comp('ConstructQuery', Keyword('CONSTRUCT') + ( ConstructTemplate  + ZeroOrMore(ParamList('datasetClause', DatasetClause)) + WhereClause + SolutionModifier + ValuesClause | ZeroOrMore(ParamList('datasetClause', DatasetClause)) + Keyword('WHERE') + '{' + Optional(Param('where', Comp('FakeGroupGraphPatten', ParamList('part', Comp('TriplesBlock', TriplesTemplate))))) + '}' + SolutionModifier + ValuesClause ) )
 
 # [12] AskQuery ::= 'ASK' DatasetClause* WhereClause SolutionModifier
 AskQuery = Comp('AskQuery', Keyword('ASK') + Param('datasetClause', ZeroOrMore(DatasetClause)) + WhereClause + SolutionModifier + ValuesClause)

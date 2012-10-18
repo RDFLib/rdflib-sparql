@@ -70,11 +70,20 @@ def evalExtend(ctx, extend):
     
     res=[]
     for c in evalPart(ctx, extend.p):
-        e=_eval(extend.expr,c)
-        if not isinstance(e, SPARQLError):
+        try: 
+            e=_eval(extend.expr,c)
+            if isinstance(e, SPARQLError):
+                raise e
+            
             res.append(c.merge({extend.var: e}))
-        else: 
+
+        except SPARQLError:
             res.append(c)
+        except: 
+            import traceback; traceback.print_exc()
+            import pdb; pdb.set_trace()
+            res.append(c) 
+            
     return res
                
         
@@ -307,7 +316,11 @@ def evalAskQuery(ctx, query):
     return res
 
 def evalConstructQuery(ctx, query):
-    template=query.template
+    template=query.template 
+
+    if not template:
+        # a construct-where query
+        template=query.p.p.triples # query->project->bgp ... 
 
     graph=Graph()
 
