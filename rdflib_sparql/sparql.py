@@ -1,5 +1,6 @@
 import collections
 import itertools
+import datetime
 
 from rdflib.namespace import NamespaceManager
 from rdflib import Variable, BNode, Graph, URIRef, Literal
@@ -14,8 +15,8 @@ class SPARQLError(Exception):
         Exception.__init__(self,msg)
 
 class NotBoundError(SPARQLError):
-    def __init__(self): 
-        SPARQLError.__init__(self)
+    def __init__(self, msg=None): 
+        SPARQLError.__init__(self, msg)
 
 class AlreadyBound(SPARQLError): 
     """Raised when trying to bind a variable that is already bound!"""
@@ -126,7 +127,7 @@ class FrozenBindings(collections.Mapping):
         return res
     
     def __str__(self):
-        return self._d.str()
+        return str(self._d)
 
     def __repr__(self): 
         return repr(self._d)
@@ -134,6 +135,15 @@ class FrozenBindings(collections.Mapping):
     def absolutize(self, iri): 
         return self.ctx.absolutize(iri)
 
+    def _now(self): 
+        return self.ctx.now
+
+    def _bnodes(self):
+        return self.ctx.bnodes
+
+    bnodes = property(_bnodes)
+    now = property(_now)
+    
     def thaw(self): 
         """
         Create a new read/write query context from this solution
@@ -152,6 +162,8 @@ class QueryContext(object):
         self.namespace_manager=NamespaceManager(Graph())  # ns man needs a store
         self.base=None
         self.vars=set()
+        
+        self.now=datetime.datetime.now()
 
         self.bnodes=collections.defaultdict(BNode)
 

@@ -3,7 +3,7 @@ from rdflib import Variable, Literal
 
 from rdflib_sparql.operators import EBV
 from rdflib_sparql.parserutils import Expr, CompValue
-from rdflib_sparql.sparql import SPARQLError
+from rdflib_sparql.sparql import SPARQLError, NotBoundError
 
 def _diff(a,b, expr): 
     res=set()
@@ -64,7 +64,10 @@ def _eval(expr, ctx):
     if isinstance(expr, Expr):         
         return expr.eval(ctx)
     elif isinstance(expr, Variable): 
-        return ctx[expr]
+        try: 
+            return ctx[expr]
+        except KeyError: 
+            return NotBoundError("Variable %s is not bound"%expr)
     elif isinstance(expr, CompValue): 
         raise Exception("Weird - _eval got a CompValue without evalfn! %r"%expr)
     else: 
@@ -72,7 +75,7 @@ def _eval(expr, ctx):
 
 
 def _filter(a,expr): 
-    #import pdb; pdb.set_trace()
+#    import pdb; pdb.set_trace()
     for c in a:
         if _ebv(expr, c):
             yield c

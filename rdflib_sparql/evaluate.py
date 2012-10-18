@@ -79,10 +79,7 @@ def evalExtend(ctx, extend):
 
         except SPARQLError:
             res.append(c)
-        except: 
-            import traceback; traceback.print_exc()
-            import pdb; pdb.set_trace()
-            res.append(c) 
+
             
     return res
                

@@ -589,28 +589,28 @@ BuiltInCall = Aggregate \
     | StrReplaceExpression \
     | Comp('Builtin_UCASE', Keyword('UCASE') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_UCASE) \
     | Comp('Builtin_LCASE', Keyword('LCASE') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_LCASE) \
-    | Comp('Builtin_ENCODE_FOR_URI', Keyword('ENCODE_FOR_URI') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_CONTAINS', Keyword('CONTAINS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ) \
+    | Comp('Builtin_ENCODE_FOR_URI', Keyword('ENCODE_FOR_URI') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_ENCODE_FOR_URI) \
+    | Comp('Builtin_CONTAINS', Keyword('CONTAINS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_CONTAINS) \
     | Comp('Builtin_STRSTARTS', Keyword('STRSTARTS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRSTARTS) \
     | Comp('Builtin_STRENDS', Keyword('STRENDS') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRENDS) \
     | Comp('Builtin_STRBEFORE', Keyword('STRBEFORE') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRBEFORE) \
     | Comp('Builtin_STRAFTER', Keyword('STRAFTER') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRAFTER) \
-    | Comp('Builtin_YEAR', Keyword('YEAR') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_MONTH', Keyword('MONTH') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_DAY', Keyword('DAY') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_HOURS', Keyword('HOURS') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_MINUTES', Keyword('MINUTES') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_SECONDS', Keyword('SECONDS') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_TIMEZONE', Keyword('TIMEZONE') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_TZ', Keyword('TZ') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_NOW', Keyword('NOW') + NIL ) \
+    | Comp('Builtin_YEAR', Keyword('YEAR') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_YEAR) \
+    | Comp('Builtin_MONTH', Keyword('MONTH') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_MONTH) \
+    | Comp('Builtin_DAY', Keyword('DAY') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_DAY) \
+    | Comp('Builtin_HOURS', Keyword('HOURS') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_HOURS) \
+    | Comp('Builtin_MINUTES', Keyword('MINUTES') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_MINUTES) \
+    | Comp('Builtin_SECONDS', Keyword('SECONDS') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_SECONDS) \
+    | Comp('Builtin_TIMEZONE', Keyword('TIMEZONE') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_TIMEZONE) \
+    | Comp('Builtin_TZ', Keyword('TZ') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_TZ) \
+    | Comp('Builtin_NOW', Keyword('NOW') + NIL ).setEvalFn(op.Builtin_NOW) \
     | Comp('Builtin_UUID', Keyword('UUID') + NIL ).setEvalFn(op.Builtin_UUID) \
     | Comp('Builtin_STRUUID', Keyword('STRUUID') + NIL ).setEvalFn(op.Builtin_STRUUID) \
-    | Comp('Builtin_MD5', Keyword('MD5') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_SHA1', Keyword('SHA1') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_SHA256', Keyword('SHA256') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_SHA384', Keyword('SHA384') + '(' + Param('arg', Expression) + ')' ) \
-    | Comp('Builtin_SHA512', Keyword('SHA512') + '(' + Param('arg', Expression) + ')' ) \
+    | Comp('Builtin_MD5', Keyword('MD5') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_MD5) \
+    | Comp('Builtin_SHA1', Keyword('SHA1') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_SHA1) \
+    | Comp('Builtin_SHA256', Keyword('SHA256') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_SHA256) \
+    | Comp('Builtin_SHA384', Keyword('SHA384') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_SHA384) \
+    | Comp('Builtin_SHA512', Keyword('SHA512') + '(' + Param('arg', Expression) + ')' ).setEvalFn(op.Builtin_SHA512) \
     | Comp('Builtin_COALESCE', Keyword('COALESCE') + Param('arg', ExpressionList) ).setEvalFn(op.Builtin_COALESCE) \
     | Comp('Builtin_IF', Keyword('IF') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ',' + Param('arg3', Expression) + ')' ).setEvalFn(op.Builtin_IF) \
     | Comp('Builtin_STRLANG', Keyword('STRLANG') + '(' + Param('arg1', Expression) + ',' + Param('arg2', Expression) + ')' ).setEvalFn(op.Builtin_STRLANG) \

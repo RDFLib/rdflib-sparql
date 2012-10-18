@@ -2,6 +2,8 @@ import re
 import math
 import random
 import uuid
+import hashlib
+import urllib2
 
 from decimal import Decimal
 
@@ -40,7 +42,7 @@ def Builtin_IRI(expr, ctx):
     if isinstance(a, URIRef): 
         return a
     if isinstance(a, Literal): 
-        return URIRef(a)
+        return ctx.absolutize(URIRef(a))
 
     raise SPARQLError('IRI function only accepts URIRefs or Literals/Strings!')
 
@@ -115,7 +117,30 @@ def Builtin_STRUUID(expr, ctx):
     http://www.w3.org/TR/sparql11-query/#func-strdt
     """
 
-    return Literal(str(uuid.uuid5()))
+    return Literal(str(uuid.uuid4()))
+
+
+def Builtin_MD5(expr, ctx): 
+    s=string(expr.arg).encode("utf-8")
+    return Literal(hashlib.md5(s).hexdigest())
+
+def Builtin_SHA1(expr, ctx): 
+    s=string(expr.arg).encode("utf-8")
+    return Literal(hashlib.sha1(s).hexdigest())
+
+def Builtin_SHA256(expr, ctx): 
+    s=string(expr.arg).encode("utf-8")
+    return Literal(hashlib.sha256(s).hexdigest())
+
+def Builtin_SHA384(expr, ctx): 
+    s=string(expr.arg).encode("utf-8")
+    return Literal(hashlib.sha384(s).hexdigest())
+
+def Builtin_SHA512(expr, ctx): 
+    s=string(expr.arg).encode("utf-8")
+    return Literal(hashlib.sha512(s).hexdigest())
+
+
 
 
 def Builtin_COALESCE(expr, ctx): 
@@ -123,7 +148,7 @@ def Builtin_COALESCE(expr, ctx):
     http://www.w3.org/TR/sparql11-query/#func-coalesce
     """
     for x in expr.arg: 
-        if not isinstance(x, SPARQLError): 
+        if x is not None and not isinstance(x, SPARQLError): 
             return x
     raise SPARQLError("COALESCE got no arguments that did not evaluate to an error")
 
@@ -173,12 +198,36 @@ def Builtin_REPLACE(expr, ctx):
     """
     http://www.w3.org/TR/sparql11-query/#func-substr
     """
-
-    text = string(expr.text)
+    text = string(expr.arg)
     pattern = string(expr.pattern)
     replacement = string(expr.replacement)
     flags = expr.flags
+
+    # python uses \1, xpath/sparql uses $1
+    replacement=re.sub('\\$([0-9]*)',r'\\\1', replacement)
+
+    def _r(m):
+
+        # Now this is ugly. 
+        # Python has a "feature" where unmatched groups return None
+        # then re.sub chokes on this.
+        # see http://bugs.python.org/issue1519638
         
+        # this works around and hooks into the internal of the re module...
+
+        # the match object is replaced with a wrapper that 
+        # returns "" instead of None for unmatched groups
+
+        class _m():
+            def __init__(self, m): 
+                self.m=m
+                self.string=m.string
+            def group(self, n):
+                return m.group(n) or ""
+
+        return re._expand(pattern, _m(m), replacement)
+    
+
     cFlag = 0
     if flags:
         # Maps XPath REGEX flags (http://www.w3.org/TR/xpath-functions/#flags)
@@ -186,7 +235,7 @@ def Builtin_REPLACE(expr, ctx):
         flagMap=dict([('i', re.IGNORECASE), ('s', re.DOTALL), ('m', re.MULTILINE)])
         cFlag=reduce(pyop.or_, [flagMap.get(f,0) for f in flags])
 
-    return Literal(re.sub(unicode(pattern),text,replacement, cFlag))
+    return Literal(re.sub(unicode(pattern),_r,text, cFlag), datatype=text.datatype, lang=text.language)
 
 
 
@@ -205,7 +254,13 @@ def Builtin_STRLANG(expr, ctx):
     http://www.w3.org/TR/sparql11-query/#func-strlang
     """
 
-    return Literal(unicode(expr.arg1), lang=unicode(expr.arg2))
+    s=string(expr.arg1)
+    if s.language or s.datatype: 
+        raise SPARQLError('STRLANG expects a simple literal')
+    
+    # TODO: normalisation of lang tag to lower-case 
+    # should probably happen in literal __init__
+    return Literal(unicode(s), lang=str(expr.arg2).lower())
 
 
 def Builtin_CONCAT(expr, ctx): 
@@ -243,18 +298,18 @@ def Builtin_STRSTARTS(expr, ctx):
     b=expr.arg2
     _compatibleStrings(a,b)
 
-    return Literal( a.startswith(b), lang=a.language, datatype=a.datatype )
+    return Literal( a.startswith(b) )
 
 def Builtin_STRENDS(expr, ctx): 
     """
     http://www.w3.org/TR/sparql11-query/#func-strends
     """
-
     a=expr.arg1
     b=expr.arg2
+
     _compatibleStrings(a,b)
 
-    return Literal( a.endswith(b), lang=a.language, datatype=a.datatype)
+    return Literal( a.endswith(b) )
 
 
 def Builtin_STRBEFORE(expr, ctx): 
@@ -267,8 +322,10 @@ def Builtin_STRBEFORE(expr, ctx):
     _compatibleStrings(a,b)
 
     i=a.find(b)
-
-    return Literal( a[:i], lang=a.language, datatype=a.datatype )
+    if i==-1: 
+        return Literal("")
+    else: 
+        return Literal(a[:i] , lang=a.language, datatype=a.datatype )
 
 def Builtin_STRAFTER(expr, ctx): 
     """
@@ -279,9 +336,14 @@ def Builtin_STRAFTER(expr, ctx):
     b=expr.arg2
     _compatibleStrings(a,b)
 
-    return Literal( a.startswith(b), lang=a.language, datatype=a.datatype )
+    i=a.find(b)
+    if i==-1: 
+        return Literal("")
+    else: 
+        return Literal(a[i+len(b):] , lang=a.language, datatype=a.datatype )
 
-def Builtin_STRCONTAINS(expr, ctx): 
+
+def Builtin_CONTAINS(expr, ctx): 
     """
     http://www.w3.org/TR/sparql11-query/#func-strcontains
     """
@@ -293,7 +355,8 @@ def Builtin_STRCONTAINS(expr, ctx):
     return Literal( b in a )
 
 
-
+def Builtin_ENCODE_FOR_URI(expr, ctx): 
+    return Literal(urllib2.quote(string(expr.arg).encode("utf-8")))
 
 def Builtin_SUBSTR(expr, ctx): 
     """
@@ -302,11 +365,11 @@ def Builtin_SUBSTR(expr, ctx):
 
     a=string(expr.arg)
 
-    start=numeric(expr.start)
+    start=numeric(expr.start)-1
 
-    length=expr.get("length") 
+    length=expr.length
     if length is not None: 
-        length=numeric(expr.start)+start
+        length=numeric(length)+start
 
     return Literal( a[start:length], lang=a.language, datatype=a.datatype )
 
@@ -332,13 +395,82 @@ def Builtin_LANGMATCHES(e,ctx):
 
     
     """
+    #import pdb; pdb.set_trace()
     langTag=string(e.arg1)
     langRange=string(e.arg2)
 
     if langTag=="": return Literal(False) # nothing matches empty!
 
     return Literal(_lang_range_check(langRange,langTag))
+
+
+def Builtin_NOW(e, ctx): 
+    return Literal(ctx.now)
+
+
+def Builtin_YEAR(e, ctx): 
+    d=datetime(e.arg)
+    return Literal(d.year)
+
+def Builtin_MONTH(e, ctx): 
+    d=datetime(e.arg)
+    return Literal(d.month)
+
+def Builtin_DAY(e, ctx): 
+    d=datetime(e.arg)
+    return Literal(d.day)
+
+def Builtin_HOURS(e, ctx): 
+    d=datetime(e.arg)
+    return Literal(d.hour)
+
+def Builtin_MINUTES(e, ctx): 
+    d=datetime(e.arg)
+    return Literal(d.minute)
+
+def Builtin_SECONDS(e, ctx): 
+    d=datetime(e.arg)
+    return Literal(d.second)
+
+def Builtin_TIMEZONE(e, ctx): 
+    """
+    Returns the timezone part of arg as an xsd:dayTimeDuration. Raises an error if there is no timezone.
+    """
+    dt=datetime(e.arg)
+    if not dt.tzinfo: raise SPARQLError('datatime has no timezone: %s'%dt)
+
+    delta=dt.tzinfo.utcoffset(ctx.now)
+
+    d=delta.days
+    s=delta.seconds
+    neg=""
+
+    if d<0:
+        s=-24*60*60*d-s
+        d=0
+        neg="-"
+
+    h=s/(60*60)
+    m=(s-h*60*60)/60    
+    s=s-h*60*60-m*60
     
+    tzdelta="%sP%sT%s%s%s"%( neg,
+                             "%dD"%d if d else "", 
+                             "%dH"%h if h else "",
+                             "%dM"%m if m else "",
+                             "%dS"%s if not d and not h and not m else "")
+    
+    return Literal(tzdelta, datatype=XSD.dayTimeDuration)
+
+def Builtin_TZ(e, ctx): 
+    d=datetime(e.arg)
+    if not d.tzinfo: return Literal("")
+    n=d.tzinfo.tzname(d)
+    if n=="UTC": n="Z"
+    return Literal(n)
+
+
+
     
 
 def Builtin_UCASE(e, ctx):    
@@ -538,16 +670,35 @@ def RelationalExpression(e, ctx):
                 ('IN', pyop.contains),
                 ('NOT IN', lambda x,y: not pyop.contains(x,y))] )
 
+
     #import pdb ; pdb.set_trace()
+
+    if op in ('IN', 'NOT IN'):
+
+        res=op == 'NOT IN'
+
+        error=False
+
+        if other==RDF.nil: other=[]
+
+        for x in other: 
+            try: 
+                if x==expr: return Literal(True ^ res)
+            except: 
+                error=True
+        if not error: return Literal(False ^ res)
+        else: return SPARQLError()
+
 
     if type(expr)!=type(other): raise SPARQLError('Comparing different types of RDF terms is an error!')
 
-    if not op in ('=', '!='): 
+    if not op in ('=', '!=', 'IN', 'NOT IN'): 
         if not isinstance(expr, Literal): raise SPARQLError("Compare other than =, != of non-literals is an error: %s"%expr )
         if not isinstance(other, Literal): raise SPARQLError("Compare other than =, != of non-literals is an error: %s"%other )
     else:
         if not isinstance(expr, Node): raise SPARQLError('I cannot compare this non-node: %s'%expr)
         if not isinstance(other, Node): raise SPARQLError('I cannot compare this non-node: %s'%other)
+
 
     if isinstance(expr, Literal) and isinstance(other, Literal): 
 
@@ -650,8 +801,16 @@ def simplify(expr):
 
 def literal(s): 
     if not isinstance(s, Literal): 
-        raise SPARQLError("Non-literal passes as string: %s"%s)
+        raise SPARQLError("Non-literal passed as string: %s"%s)
     return s
+
+def datetime(e): 
+    if not isinstance(e, Literal): 
+        raise SPARQLError("Non-literal passed as datetime: %s"%e)
+    if not e.datatype==XSD.dateTime:
+        raise SPARQLError("Literal with wrong datatype passed as datetime: %s"%e)
+    return e.toPython()
+
 
 def string(s): 
     """
