@@ -35,7 +35,6 @@ class NegatedPath(Path):
         self.path=path
 
 
-
 def path_alternative(self,other):
     if not isinstance(other, (URIRef, Path)): 
         raise Exception('Only URIRefs or Paths can be in paths!')

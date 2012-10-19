@@ -49,6 +49,8 @@ def Project(p, PV):
 def Group(p, expr=None): 
     return CompValue('Group', p=p, expr=expr)
 
+
+
 def triples(l): 
     l=reduce(lambda x,y: x+y, l)
     if (len(l) % 3) != 0: 
@@ -56,6 +58,14 @@ def triples(l):
         raise Exception('these aint triples')
     return [(l[x],l[x+1],l[x+2]) for x in range(0,len(l),3)]
 
+def translatePath(p):
+    if isinstance(p, CompValue): 
+        if p.name in ('PathAlternative','PathSequence') and len(p.part)==1:
+            return p.part[0]
+        if p.name == 'PathElt' and not p.mod: 
+            return p.part
+        
+            
 
 def convertExists(e):
 
@@ -323,10 +333,13 @@ def translate(q):
     #import pdb; pdb.set_trace()
     _traverse(q, _simplifyFilters)
 
+    q.where=traverse(q.where, visitPost=translatePath)
+
     # TODO: Var scope test
     VS=set()
     traverse(q.where, functools.partial(_findVars, res=VS))
 
+    
     # all query types have a where part
     M=translateGroupGraphPattern(q.where)
 

@@ -1,4 +1,4 @@
-
+import sys
 import re
 import traceback
 
@@ -121,7 +121,27 @@ IRIREF.setParseAction(lambda x: rdflib.URIRef(x[0]))
 
 # [164] P_CHARS_BASE ::= [A-Z] | [a-z] | [#x00C0-#x00D6] | [#x00D8-#x00F6] | [#x00F8-#x02FF] | [#x0370-#x037D] | [#x037F-#x1FFF] | [#x200C-#x200D] | [#x2070-#x218F] | [#x2C00-#x2FEF] | [#x3001-#xD7FF] | [#xF900-#xFDCF] | [#xFDF0-#xFFFD] | [#x10000-#xEFFFF]
 
-PN_CHARS_BASE_re = u'A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\U00010000-\U000EFFFF'
+if sys.maxunicode==0xffff: 
+    # this is narrow python build (default on windows/osx)
+    # this means that unicode code points over 0xffff are stored 
+    # as several characters, which in turn means that regex character 
+    # ranges with these characters do not work.
+    # See 
+    # * http://bugs.python.org/issue12729
+    # * http://bugs.python.org/issue12749
+    # * http://bugs.python.org/issue3665
+    #
+    # Here we simple skip the [#x10000-#xEFFFF] part
+    # this means that some SPARQL queries will not parse :(
+    # We *could* generate a new regex with \U00010000|\U00010001 ... 
+    # but it would be quite long :)
+    # 
+    # in py3.3 this is fixed
+
+    PN_CHARS_BASE_re = u'A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD'
+else:
+    # wide python build
+    PN_CHARS_BASE_re = u'A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\U00010000-\U000EFFFF'
 
 # [165] PN_CHARS_U ::= PN_CHARS_BASE | '_'
 PN_CHARS_U_re = '_'+PN_CHARS_BASE_re
@@ -354,31 +374,31 @@ GraphNodePath = VarOrTerm | TriplesNodePath
 PathMod = Literal('?') | '*' | '+'
 
 # [96] PathOneInPropertySet ::= iri | A | '^' ( iri | A )
-PathOneInPropertySet = iri | A | '^' + ( iri | A )
+PathOneInPropertySet = iri | A | Comp('InversePath', '^' + ( iri | A ))
 
 Path = Forward()
 
 # [95] PathNegatedPropertySet ::= PathOneInPropertySet | '(' ( PathOneInPropertySet ( '|' PathOneInPropertySet )* )? ')'
-PathNegatedPropertySet = PathOneInPropertySet | '(' + Optional( PathOneInPropertySet + ZeroOrMore( '|' + PathOneInPropertySet ) ) + ')'
+PathNegatedPropertySet = Comp('PathNegatedPropertySet', ParamList('part', PathOneInPropertySet) | '(' + Optional( ParamList('part', PathOneInPropertySet) + ZeroOrMore( '|' + ParamList('part', PathOneInPropertySet) ) ) + ')')
 
 # [94] PathPrimary ::= iri | A | '!' PathNegatedPropertySet | '(' Path ')' | 'DISTINCT' '(' Path ')'
-PathPrimary = iri | A | '!' + PathNegatedPropertySet | '(' + Path + ')' | Keyword('DISTINCT') + '(' + Path + ')'
+PathPrimary = iri | A | '!' + PathNegatedPropertySet | '(' + Path + ')' | Comp('DistinctPath', Keyword('DISTINCT') + '(' + Param('part', Path) + ')')
 
 # [91] PathElt ::= PathPrimary Optional(PathMod)
-PathElt = PathPrimary + Optional(PathMod).leaveWhitespace()
+PathElt = Comp('PathElt', Param('part', PathPrimary) + Optional(Param('mod', PathMod.leaveWhitespace())))
 
 # [92] PathEltOrInverse ::= PathElt | '^' PathElt
-PathEltOrInverse = PathElt | '^' + PathElt
+PathEltOrInverse = PathElt | '^' + Comp('PathEltOrInverse', Param('part', PathElt))
 
 # [90] PathSequence ::= PathEltOrInverse ( '/' PathEltOrInverse )*
-PathSequence = PathEltOrInverse + ZeroOrMore( '/' + PathEltOrInverse )
+PathSequence = Comp('PathSequence', ParamList('part', PathEltOrInverse) + ZeroOrMore( '/' + ParamList('part', PathEltOrInverse )))
 
 
 # [89] PathAlternative ::= PathSequence ( '|' PathSequence )*
-PathAlternative = PathSequence + ZeroOrMore( '|' + PathSequence )
+PathAlternative = Comp('PathAlternative', ParamList('part', PathSequence) + ZeroOrMore( '|' + ParamList('part', PathSequence )))
 
 # [88] Path ::= PathAlternative
-Path << Group ( PathAlternative ) 
+Path << Group(PathAlternative )
 
 # [84] VerbPath ::= Path
 VerbPath = Path
