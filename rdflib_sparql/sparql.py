@@ -30,7 +30,12 @@ class SPARQLTypeError(SPARQLError):
 class Bindings(collections.MutableMapping):
 
     """
-    In python 3.3 this could be a collections.ChainMap
+
+    A single level of a stack of variable-value bindings. 
+    Each dict keeps a reference to the dict below it, 
+    any failed lookup is propegated back    
+
+    In python 3.3 this could be a collections.ChainMap    
     """
 
     def __init__(self, outer=None, d=[]): 
@@ -132,15 +137,16 @@ class FrozenBindings(collections.Mapping):
     def __repr__(self): 
         return repr(self._d)
 
-    def absolutize(self, iri): 
-        return self.ctx.absolutize(iri)
-
     def _now(self): 
         return self.ctx.now
 
     def _bnodes(self):
         return self.ctx.bnodes
 
+    def _prologue(self):
+        return self.ctx.prologue
+
+    prologue = property(_prologue)
     bnodes = property(_bnodes)
     now = property(_now)
     
@@ -155,25 +161,24 @@ class FrozenBindings(collections.Mapping):
 
 class QueryContext(object): 
 
+    """
+    Query context - passed along when evaluating the query
+    """
+
     def __init__(self, graph=None): 
         self.bindings=Bindings()
         self.dataset=graph
         self._graph=[self.dataset.default_context]
-        self.namespace_manager=NamespaceManager(Graph())  # ns man needs a store
-        self.base=None
-        self.vars=set()
-        
+        self.prologue=None
         self.now=datetime.datetime.now()
 
         self.bnodes=collections.defaultdict(BNode)
 
     def clone(self): 
         r=QueryContext(self.dataset)
+        r.prologue=self.prologue
         r.bindings.update(self.bindings)
         r._graph=list(self._graph)
-        r.namespace_manager=self.namespace_manager
-        r.base=self.base
-        r.vars=self.vars
         r.bnodes=self.bnodes
         return r
 
@@ -242,27 +247,47 @@ class QueryContext(object):
         if self.bindings==None:
             raise Exception("We've bottomed out of the bindings stack!")
 
+
+
+class Prologue: 
+
+    """
+    A class for holding prefixing bindings and base URI information
+    """
+
+    def __init__(self):
+        self.base=None
+        self.namespace_manager=NamespaceManager(Graph())  # ns man needs a store
+
     def resolvePName(self, prefix, localname): 
         return URIRef(self.namespace_manager.store.namespace(prefix or "")+(localname or ""))
-    
+
+    def bind(self, prefix, uri): 
+        self.namespace_manager.bind(prefix, uri)
+
     def absolutize(self, iri):
     
         """
-        Apply BASE / PREFIXes to URIs 
+        Apply BASE / PREFIXes to URIs
         (and to datatypes in Literals)
-
+        
         TODO: Move resolving URIs to pre-processing
-       
         """
     
-        if isinstance(iri, CompValue): 
+        if isinstance(iri, CompValue):
             if iri.name=='pname':
                 return self.resolvePName(iri.prefix, iri.localname)
             if iri.name=='literal':
-                return Literal(iri.string, lang=iri.lang, datatype=self.absolutize(iri.datatype))        
-        elif isinstance(iri, Variable): 
-            self.vars.add(iri)
+                return Literal(iri.string, lang=iri.lang, datatype=self.absolutize(iri.datatype))
         elif isinstance(iri,URIRef) and not ':' in iri: # TODO: Better check for relative URI?
             return URIRef(self.base+iri)
         return iri
 
+class Query:
+    """
+    A parsed and translated query
+    """
+
+    def __init__(self, prologue, algebra):
+        self.prologue=prologue
+        self.algebra=algebra

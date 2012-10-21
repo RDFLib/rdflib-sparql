@@ -382,13 +382,13 @@ Path = Forward()
 PathNegatedPropertySet = Comp('PathNegatedPropertySet', ParamList('part', PathOneInPropertySet) | '(' + Optional( ParamList('part', PathOneInPropertySet) + ZeroOrMore( '|' + ParamList('part', PathOneInPropertySet) ) ) + ')')
 
 # [94] PathPrimary ::= iri | A | '!' PathNegatedPropertySet | '(' Path ')' | 'DISTINCT' '(' Path ')'
-PathPrimary = iri | A | '!' + PathNegatedPropertySet | '(' + Path + ')' | Comp('DistinctPath', Keyword('DISTINCT') + '(' + Param('part', Path) + ')')
+PathPrimary = iri | A | Suppress('!') + PathNegatedPropertySet | Suppress('(') + Path + Suppress(')') | Comp('DistinctPath', Keyword('DISTINCT') + '(' + Param('part', Path) + ')')
 
 # [91] PathElt ::= PathPrimary Optional(PathMod)
 PathElt = Comp('PathElt', Param('part', PathPrimary) + Optional(Param('mod', PathMod.leaveWhitespace())))
 
 # [92] PathEltOrInverse ::= PathElt | '^' PathElt
-PathEltOrInverse = PathElt | '^' + Comp('PathEltOrInverse', Param('part', PathElt))
+PathEltOrInverse = PathElt | Suppress('^') + Comp('PathEltOrInverse', Param('part', PathElt))
 
 # [90] PathSequence ::= PathEltOrInverse ( '/' PathEltOrInverse )*
 PathSequence = Comp('PathSequence', ParamList('part', PathEltOrInverse) + ZeroOrMore( '/' + ParamList('part', PathEltOrInverse )))
@@ -398,7 +398,7 @@ PathSequence = Comp('PathSequence', ParamList('part', PathEltOrInverse) + ZeroOr
 PathAlternative = Comp('PathAlternative', ParamList('part', PathSequence) + ZeroOrMore( '|' + ParamList('part', PathSequence )))
 
 # [88] Path ::= PathAlternative
-Path << Group(PathAlternative )
+Path << PathAlternative 
 
 # [84] VerbPath ::= Path
 VerbPath = Path

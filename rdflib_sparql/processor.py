@@ -2,6 +2,7 @@
 from rdflib import BNode, Variable
 from rdflib.query import Processor, Result
 
+from rdflib_sparql.sparql import Query
 from rdflib_sparql.parser import parseQuery
 from rdflib_sparql.evaluate import evalQuery
 from rdflib_sparql.algebra import translateQuery
@@ -33,8 +34,11 @@ class SPARQLProcessor(Processor):
         will be overridden by any BASE given in the query
         """
         
-        query=parseQuery(strOrQuery)
-        query=translateQuery(query)
+        if not isinstance(strOrQuery, Query):
+            parsetree=parseQuery(strOrQuery)
+            query=translateQuery(parsetree,base)
+        else: 
+            query=strOrQuery
         
         return SPARQLResult(**evalQuery(self.graph, query, initBindings, initNs, base))
         

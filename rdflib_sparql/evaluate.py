@@ -34,7 +34,7 @@ def evalBGP(ctx, bgp):
         return [ctx.solution()]
 
     res=[]
-    s,p,o=[ctx.absolutize(x) for x in bgp[0]]
+    s,p,o=bgp[0]
 
     _s=ctx[s]
     _p=ctx[p]
@@ -124,7 +124,7 @@ def evalFilter(ctx, part):
 
 def evalGraph(ctx, part): 
     ctx=ctx.clone()
-    graph=ctx[ctx.absolutize(part.term)]
+    graph=ctx[part.term]
     if graph is None:
         for graph in ctx.dataset.contexts(): 
 
@@ -324,7 +324,7 @@ def evalConstructQuery(ctx, query):
     for c in evalPart(ctx, query.p):
         bnodeMap=collections.defaultdict(BNode) 
         for t in template:
-            s,p,o=[c.absolutize(x) for x in t]
+            s,p,o=t
 
             _s=c.get(s)
             _p=c.get(p)
@@ -348,8 +348,8 @@ def evalConstructQuery(ctx, query):
 
 def evalQuery(graph, query, initBindings, initNs, base=None):
     ctx=QueryContext(graph)
-    if base:
-        ctx.base=base
+
+    ctx.prologue=query.prologue
 
     if initBindings:
         for k,v in initBindings.iteritems(): 
@@ -358,18 +358,11 @@ def evalQuery(graph, query, initBindings, initNs, base=None):
             ctx[k]=v
         ctx.push() # nescessary?
 
-    if initNs:
+    if initNs: # Hmm... are these ever used at this point?
         for k,v in initNs:
-            ctx.namespace_manager.bind(k,v)
+            ctx.prologue.namespace_manager.bind(k,v)
 
-    prologue=query[0]
-    for x in prologue:
-        if x.name=='Base': 
-            ctx.base=x.iri
-        elif x.name=='PrefixDecl':
-            ctx.namespace_manager.bind(x.prefix, ctx.absolutize(x.iri))
-
-    main=query[1]
+    main=query.algebra
 
     #import pdb; pdb.set_trace()
     if main.datasetClause:
@@ -384,11 +377,11 @@ def evalQuery(graph, query, initBindings, initNs, base=None):
                     dg=ctx.dataset.get_context(BNode())
                     ctx.pushGraph(dg)
                 
-                g=ctx.absolutize(d.default)
+                g=d.default
                 ctx.load(g, default=True)
 
             elif d.named:
-                g=ctx.absolutize(d.named)
+                g=d.named
                 ctx.load(g, default=False)
         
     return evalPart(ctx, main)

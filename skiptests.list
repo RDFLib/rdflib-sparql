@@ -30,3 +30,10 @@ http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg-a
 http://www.w3.org/2009/sparql/docs/tests/data-sparql11/aggregates/manifest#agg-err-01	literal type-promotion arithmetic
 http://www.w3.org/2009/sparql/docs/tests/data-sparql11/functions/manifest#strlang02	literal equality - language-tag case
 http://www.w3.org/2009/sparql/docs/tests/data-sparql11/functions/manifest#coalesce01	literal arithmetic
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service1	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service2	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service3	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service4a	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service5	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service6	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service7	service not implemented

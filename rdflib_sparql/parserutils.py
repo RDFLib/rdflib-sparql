@@ -55,12 +55,7 @@ def value(ctx, val, variables=False, errors=False):
     if isinstance(val, Expr): 
         return val.eval(ctx) # recurse?
     elif isinstance(val, CompValue):
-        if val.name=='literal': 
-            return ctx.absolutize(val)
-        elif val.name=='pname':
-            return ctx.absolutize(val)
-        else: 
-            raise Exception("What do I do with this CompValue? %s"%val)
+        raise Exception("What do I do with this CompValue? %s"%val)
 
     elif isinstance(val, list): 
         return [value(ctx,x) for x in val]
@@ -79,10 +74,6 @@ def value(ctx, val, variables=False, errors=False):
 
     elif isinstance(val, ParseResults) and len(val)==1:
         return value(ctx,val[0])
-
-    elif isinstance(val, URIRef): 
-        return ctx.absolutize(val) 
-
     else: 
         return val
 

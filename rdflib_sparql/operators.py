@@ -42,7 +42,7 @@ def Builtin_IRI(expr, ctx):
     if isinstance(a, URIRef): 
         return a
     if isinstance(a, Literal): 
-        return ctx.absolutize(URIRef(a))
+        return ctx.prologue.absolutize(URIRef(a))
 
     raise SPARQLError('IRI function only accepts URIRefs or Literals/Strings!')
 

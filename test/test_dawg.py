@@ -158,11 +158,11 @@ def do_test_single(t):
             # no result - syntax test
 
             if syntax: 
-                translateQuery(parseQuery(file(query[7:]).read()))
+                translateQuery(parseQuery(file(query[7:]).read()), base=urljoin(query,'.'))
             else: 
                 # negative syntax test
                 try: 
-                    translateQuery(parseQuery(file(query[7:]).read()))
+                    translateQuery(parseQuery(file(query[7:]).read()), base=urljoin(query,'.'))
 
                     assert False, 'Query should not have parsed!'
                 except: 
@@ -260,7 +260,7 @@ def do_test_single(t):
             try: 
                 pq=parseQuery(file(query[7:]).read())
                 print "----------------- Parsed ------------------"
-                pprintAlgebra(translateQuery(pq))
+                pprintAlgebra(translateQuery(pq, base=urljoin(query,'.')))
             except: 
                 print "(parser error)"
 

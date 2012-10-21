@@ -1,10 +1,12 @@
 
 import functools
 
-from rdflib import Literal, Variable
+from rdflib import Literal, Variable, URIRef
 
+from rdflib_sparql.sparql import Prologue, Query
 from rdflib_sparql.parserutils import CompValue, Expr
 from rdflib_sparql.operators import and_, simplify as simplifyFilters
+from rdflib_sparql.paths import InvPath, AlternativePath, SequencePath, ModPath, NegatedPath
 
 from pyparsing import ParseResults
 
@@ -12,6 +14,7 @@ TrueFilter=Expr('TrueFilter', lambda _1, _2: Literal(True))
 
 
 # ---------------------------
+# Some convenience methods
 
 def OrderBy(p, expr): 
     return CompValue('OrderBy', p=p, expr=expr)
@@ -58,16 +61,74 @@ def triples(l):
         raise Exception('these aint triples')
     return [(l[x],l[x+1],l[x+2]) for x in range(0,len(l),3)]
 
-def translatePath(p):
+def translatePName(p,prologue):
+    """
+    Expand prefixed/relative URIs
+    """
     if isinstance(p, CompValue): 
-        if p.name in ('PathAlternative','PathSequence') and len(p.part)==1:
-            return p.part[0]
-        if p.name == 'PathElt' and not p.mod: 
-            return p.part
+        if p.name=='pname':
+            return prologue.absolutize(p)
+        if p.name=='literal':
+            return Literal(p.string, lang=p.lang, datatype=prologue.absolutize(p.datatype))
+    elif isinstance(p,URIRef):
+        return prologue.absolutize(p)
+    
+    
+
+def translatePath(p):
+
+    """
+    Translate PropertyPath expressions
+    """
+
+    if isinstance(p, CompValue): 
+        if p.name == 'PathAlternative':
+            if len(p.part)==1:
+                return p.part[0]
+            else:
+                return AlternativePath(*p.part)
+
+        elif p.name == 'PathSequence':
+            if len(p.part)==1:
+                return p.part[0]
+            else:
+                return SequencePath(*p.part)
+                
+        elif p.name == 'PathElt':
+            if not p.mod: 
+                return p.part
+            else:
+                if isinstance(p.part, list): 
+                    if len(p.part)!=1: 
+                        raise Exception('Denkfehler!')
+                
+                    return ModPath(p.part[0], p.mod)
+                else: 
+                    return ModPath(p.part, p.mod)
+
+        elif p.name == 'PathEltOrInverse': 
+            if isinstance(p.part, list):
+                if len(p.part)!=1: 
+                    raise Exception('Denkfehler!')
+                return InvPath(p.part[0])
+            else:
+                return InvPath(p.part)
+        
+        elif p.name == 'PathNegatedPropertySet':
+            if isinstance(p.part, list):
+                return NegatedPath(AlternativePath(*p.part))
+            else:            
+                return NegatedPath(p.part)
+        
         
             
 
-def convertExists(e):
+def translateExists(e):
+
+    """
+    Translate the graph pattern used by EXISTS and NOT EXISTS
+    http://www.w3.org/TR/sparql11-query/#sparqlCollectFilters    
+    """
 
     def _c(n): 
         if isinstance(n, CompValue):
@@ -81,11 +142,19 @@ def convertExists(e):
 
 def findFilters(parts):
 
+    """
+
+    FILTER expressions apply to the whole group graph pattern in which
+    they appear.
+
+    http://www.w3.org/TR/sparql11-query/#sparqlCollectFilters
+    """
+
     filters=[]
     
     for p in parts:
         if p.name=='Filter':
-            filters.append(convertExists(p.expr))
+            filters.append(translateExists(p.expr))
 
     if filters:
         return and_(*filters)
@@ -183,10 +252,9 @@ def _traverse(e,visitPre=lambda n: None,visitPost=lambda n: None):
     Traverse a parse-tree, visit each node    
 
     if visit functions return a value, replace current node
-    and do not recurse further
     """
     _e=visitPre(e)
-    if _e: return _e 
+    if _e is not None: return _e 
     
     
     if e is None: return None
@@ -201,7 +269,7 @@ def _traverse(e,visitPre=lambda n: None,visitPost=lambda n: None):
             e[k]=_traverse(val, visitPre,visitPost)
 
     _e=visitPost(e)
-    if _e: return _e 
+    if _e is not None: return _e 
 
     return e
 
@@ -420,6 +488,7 @@ def translate(q):
 
 
 def simplify(n): 
+    """Remove joins to empty BGPs"""
     if isinstance(n, CompValue) and n.name=='Join':
         if n.p1.name=='BGP' and len(n.p1.triples)==0:
             return n.p2
@@ -427,11 +496,24 @@ def simplify(n):
             return n.p1
 
     
-def translateQuery(q): 
+def translateQuery(q, base=None): 
     """
     We get in: 
-    (prologue, selectquery, [values])
+    (prologue, query)
     """
+    
+    prologue=Prologue()
+    if base:
+        prologue.base=base
+
+    for x in q[0]:
+        if x.name=='Base': 
+            prologue.base=x.iri
+        elif x.name=='PrefixDecl':
+            prologue.bind(x.prefix, prologue.absolutize(x.iri))
+
+    # absolutize/resolve prefixes
+    q[1]=traverse(q[1], visitPost=functools.partial(translatePName, prologue=prologue))
 
     P,PV=translate(q[1])
     datasetClause=q[1].datasetClause
@@ -439,15 +521,15 @@ def translateQuery(q):
 
         template=triples(q[1].template) if q[1].template else None
 
-        res=q[0],CompValue(q[1].name, p=P, 
+        res=CompValue(q[1].name, p=P, 
                            template=template,
                            datasetClause=datasetClause)
     else: 
-        res=q[0],CompValue(q[1].name, p=P, datasetClause=datasetClause, PV=PV)
+        res=CompValue(q[1].name, p=P, datasetClause=datasetClause, PV=PV)
 
     res=traverse(res,visitPost=simplify)
 
-    return res
+    return Query(prologue, res)
     
 
 def pprintAlgebra(q): 
@@ -465,7 +547,7 @@ def pprintAlgebra(q):
             print "%s%s ="%(ind,k,),
             pp(p[k],ind+"    ")
         print "%s)"%ind
-    pp(q[1])
+    pp(q.algebra)
 
 if __name__=='__main__': 
     import sys
@@ -477,4 +559,7 @@ if __name__=='__main__':
     else: 
         q=sys.argv[1]
 
-    print pprintAlgebra(translateQuery(rdflib_sparql.parser.QueryUnit.parseString(q)))
+    pq=rdflib_sparql.parser.QueryUnit.parseString(q)
+    print pq
+    tq=translateQuery(pq)
+    print pprintAlgebra(tq)
