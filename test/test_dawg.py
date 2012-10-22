@@ -2,6 +2,7 @@ import collections
 import os.path
 import datetime
 import isodate
+from StringIO import StringIO
 
 from rdflib import ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef, BNode, Literal
 from rdflib.query import Result
@@ -182,6 +183,19 @@ def do_test_single(t):
             res=RDFResultParser().parse(resg)            
         elif resfile.endswith('srj'):
             res=Result.parse(file(resfile[7:]), format='json')
+        elif resfile.endswith('tsv'):
+            res=Result.parse(file(resfile[7:]), format='tsv')
+
+        elif resfile.endswith('csv'):
+            res=Result.parse(file(resfile[7:]), format='csv')
+
+            # CSV is lossy, round-trip our own resultset to 
+            # lose the same info :) 
+            s=StringIO()
+            res2.serialize(s, format='csv')
+            s=StringIO(s.getvalue()) # hmm ? 
+            res2=Result.parse(s, format='csv')
+
         else:
             res=Result.parse(file(resfile[7:]),format='xml') 
 
@@ -305,7 +319,7 @@ def read_manifest(f):
                 name=g.value(e, MF.name)
                 comment=g.value(e,RDFS.comment)
                 
-                if t == MF.QueryEvaluationTest:
+                if t in (MF.QueryEvaluationTest, MF.CSVResultFormatTest):
                     a=g.value(e, MF.action)
                     query=g.value(a, QT.query)              
                     data=g.value(a, QT.data)

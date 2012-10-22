@@ -12,10 +12,16 @@ setup(
         'rdf.plugins.resultserializer': [
             'xml = rdflib_sparql.results.xmlresults:XMLResultSerializer',
             'json = rdflib_sparql.results.jsonresults:JSONResultSerializer',
+            'csv = rdflib_sparql.results.csvresults:CSVResultSerializer',
+
+
         ],
         'rdf.plugins.resultparser': [
             'xml = rdflib_sparql.results.xmlresults:XMLResultParser',
             'json = rdflib_sparql.results.jsonresults:JSONResultParser',
+            'csv = rdflib_sparql.results.csvresults:CSVResultParser',
+            'tsv = rdflib_sparql.results.tsvresults:TSVResultParser',
+
         ],
         }
 

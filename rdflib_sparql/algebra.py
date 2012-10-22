@@ -201,7 +201,7 @@ def translateGroupGraphPattern(graphPattern):
                 g.append(BGP())
             g[-1]["triples"]+=triples(p.triples)
         elif p.name=='Bind': 
-            if not g:
+            if not g or g[-1].name!='BGP':
                 g.append(BGP())
             g[-1]=Extend(g[-1], p.expr, p.var)
         else: 
