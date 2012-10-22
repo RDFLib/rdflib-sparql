@@ -123,7 +123,8 @@
 
 :values1 rdf:type mf:QueryEvaluationTest ;
     mf:name    "Post-query VALUES with subj-var, 1 row" ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     mf:action
     [
         qt:query  <values01.rq> ;
@@ -133,7 +134,8 @@
 
 :values2 rdf:type mf:QueryEvaluationTest ;
     mf:name    "Post-query VALUES with obj-var, 1 row" ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     mf:action
     [
         qt:query  <values02.rq> ;
@@ -143,7 +145,8 @@
 
 :values3 rdf:type mf:QueryEvaluationTest ;
     mf:name    "Post-query VALUES with 2 obj-vars, 1 row" ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     mf:action
     [
         qt:query  <values03.rq> ;
@@ -153,7 +156,8 @@
 
 :values4 rdf:type mf:QueryEvaluationTest ;
     mf:name    "Post-query VALUES with 2 obj-vars, 1 row with UNDEF" ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     mf:action
     [
         qt:query  <values04.rq> ;
@@ -163,7 +167,8 @@
 
 :values5 rdf:type mf:QueryEvaluationTest ;
     mf:name    "Post-query VALUES with 2 obj-vars, 2 rows with UNDEF" ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     mf:action
     [
         qt:query  <values05.rq> ;
@@ -173,7 +178,8 @@
 
 :values6 rdf:type mf:QueryEvaluationTest ;
     mf:name    "Post-query VALUES with pred-var, 1 row" ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     mf:action
     [
         qt:query  <values06.rq> ;
@@ -183,7 +189,8 @@
 
 :values7 rdf:type mf:QueryEvaluationTest ;
     mf:name    "Post-query VALUES with (OPTIONAL) obj-var, 1 row" ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2011-05-24#resolution_4> ;
     mf:action
     [
@@ -194,7 +201,8 @@
 
 :values8 rdf:type mf:QueryEvaluationTest ;
     mf:name    "Post-query VALUES with subj/obj-vars, 2 rows with UNDEF" ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     mf:action
     [
         qt:query  <values08.rq> ;
@@ -205,7 +213,8 @@
 
 :inline1 rdf:type mf:QueryEvaluationTest ;
     mf:name    "Inline VALUES graph pattern" ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     mf:action
     [
         qt:query  <inline01.rq> ;
@@ -215,7 +224,8 @@
 
 :inline2 rdf:type mf:QueryEvaluationTest ;
     mf:name    "Post-subquery VALUES" ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     mf:action
     [
         qt:query  <inline02.rq> ;

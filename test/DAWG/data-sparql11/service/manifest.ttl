@@ -90,7 +90,8 @@
 
 :service4a rdf:type mf:QueryEvaluationTest ;
        mf:name    "SERVICE test 4a with VALUES clause" ;
-       dawgt:approval dawgt:NotClassified ;
+        dawgt:approval dawgt:Approved ;
+        dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_4> ;
        mf:feature sd:BasicFederatedQuery ;
        mf:action [
                qt:query  <service04a.rq> ;

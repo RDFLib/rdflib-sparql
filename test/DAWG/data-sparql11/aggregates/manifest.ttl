@@ -338,7 +338,8 @@
     mf:name "Aggregate over empty group resulting in a row with unbound variables" ;
 	mf:feature sparql:aggregate ;
 	rdfs:seeAlso <http://answers.semanticweb.com/questions/17410/semantics-of-sparql-aggregates> ;
-    dawgt:approval dawgt:NotClassified ;
+    dawgt:approval dawgt:Approved ;
+    dawgt:approvedBy <http://www.w3.org/2009/sparql/meeting/2012-08-07#resolution_2> ;
     mf:action
          [ qt:query  <agg-empty-group.rq> ;
            qt:data   <empty.ttl> ] ;
