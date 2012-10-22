@@ -1,5 +1,12 @@
 
-from rdflib import BNode, Variable
+"""
+Code for tying SPARQL Engine into RDFLib
+
+These should be automatically registered with RDFLib 
+
+"""
+
+
 from rdflib.query import Processor, Result
 
 from rdflib_sparql.sparql import Query
@@ -7,19 +14,14 @@ from rdflib_sparql.parser import parseQuery
 from rdflib_sparql.evaluate import evalQuery
 from rdflib_sparql.algebra import translateQuery
 
-"""
-Code for tying SPARQL Engine into RDFLib
-"""
-
 class SPARQLResult(Result):
     
-    def __init__(self, type_, vars_=None, bindings=None, 
-                 askAnswer=None, graph=None): 
-        Result.__init__(self,type_)
-        self.vars=vars_
-        self.bindings=bindings
-        self.askAnswer=askAnswer
-        self.graph=graph
+    def __init__(self, res): 
+        Result.__init__(self,res["type_"])
+        self.vars=res.get("vars_")
+        self.bindings=res.get("bindings")
+        self.askAnswer=res.get("askAnswer")
+        self.graph=res.get("graph")
 
 
 class SPARQLProcessor(Processor): 
@@ -40,5 +42,5 @@ class SPARQLProcessor(Processor):
         else: 
             query=strOrQuery
         
-        return SPARQLResult(**evalQuery(self.graph, query, initBindings, initNs, base))
+        return evalQuery(self.graph, query, initBindings, initNs, base)
         

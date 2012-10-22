@@ -123,6 +123,10 @@ def evalFilter(ctx, part):
     return _filter(evalPart(ctx, part.p), part.expr)
 
 def evalGraph(ctx, part): 
+
+    if ctx.dataset is None: 
+        raise Exception("Non-conjunctive-graph doesn't know about graphs. Try a query without GRAPH.")
+
     ctx=ctx.clone()
     graph=ctx[part.term]
     if graph is None:
@@ -141,8 +145,6 @@ def evalGraph(ctx, part):
             ctx.popGraph()
         return res
     else: 
-        if not isinstance(ctx.dataset, ConjunctiveGraph): 
-            raise Exception("Non-conjunctive-graph doesn't know about graphs!")
         ctx.pushGraph(ctx.dataset.get_context(graph))
         return evalPart(ctx, part.p)
         
@@ -366,6 +368,9 @@ def evalQuery(graph, query, initBindings, initNs, base=None):
 
     #import pdb; pdb.set_trace()
     if main.datasetClause:
+        if ctx.dataset is None: 
+            raise Exception("Non-conjunctive-graph doesn't know about graphs! Try a query without FROM (NAMED).")
+
         ctx=ctx.clone() # or push/pop?
 
         firstDefault=False

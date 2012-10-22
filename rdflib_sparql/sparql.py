@@ -3,7 +3,7 @@ import itertools
 import datetime
 
 from rdflib.namespace import NamespaceManager
-from rdflib import Variable, BNode, Graph, URIRef, Literal
+from rdflib import Variable, BNode, Graph, ConjunctiveGraph, URIRef, Literal
 
 from parserutils import CompValue
 
@@ -171,8 +171,12 @@ class QueryContext(object):
 
     def __init__(self, graph=None): 
         self.bindings=Bindings()
-        self.dataset=graph
-        self._graph=[self.dataset.default_context]
+        if isinstance(graph, ConjunctiveGraph): 
+            self.dataset=graph
+            self._graph=[self.dataset.default_context]
+        else: 
+            self.dataset=None
+            self._graph=[graph]
         self.prologue=None
         self.now=datetime.datetime.now()
 
