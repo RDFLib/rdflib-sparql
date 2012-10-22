@@ -36,6 +36,8 @@ DETAILEDASSERT=True
 
 MF=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#')
 QT=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-query#')
+UP=Namespace('http://www.w3.org/2009/sparql/tests/test-update#')
+
 DAWG=Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-dawg#')
 DOAP = Namespace('http://usefulinc.com/ns/doap#')
 FOAF = Namespace('http://xmlns.com/foaf/0.1/')
@@ -314,7 +316,7 @@ def read_manifest(f):
                             (e, DAWG.approval, DAWG.NotClassified) in g): continue
                 
                 t=g.value(e, RDF.type)
-                if t in (MF.PositiveUpdateSyntaxTest11, MF.NegativeUpdateSyntaxTest11, MF.UpdateEvaluationTest, MF.ProtocolTest): continue # skip update tests
+                if t in (UP.UpdateEvaluationTest, MF.ServiceDescriptionTest, MF.PositiveUpdateSyntaxTest11, MF.NegativeUpdateSyntaxTest11, MF.UpdateEvaluationTest, MF.ProtocolTest): continue # skip update tests
 
                 name=g.value(e, MF.name)
                 comment=g.value(e,RDFS.comment)

@@ -147,8 +147,8 @@ def Builtin_COALESCE(expr, ctx):
     """
     http://www.w3.org/TR/sparql11-query/#func-coalesce
     """
-    for x in expr.arg: 
-        if x is not None and not isinstance(x, SPARQLError): 
+    for x in expr.get('arg', variables=True): 
+        if x is not None and not isinstance(x, (SPARQLError, Variable)): 
             return x
     raise SPARQLError("COALESCE got no arguments that did not evaluate to an error")
 

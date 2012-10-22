@@ -16,7 +16,7 @@ def _diff(a,b, expr):
 def _minus(a,b): 
     res=set()
     for x in a: 
-        if all(not x.compatible(y) for y in b):
+        if all((not x.compatible(y)) or x.disjointDomain(y) for y in b):
             res.add(x)
 
     return res

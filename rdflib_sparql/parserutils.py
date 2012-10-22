@@ -58,7 +58,7 @@ def value(ctx, val, variables=False, errors=False):
         raise Exception("What do I do with this CompValue? %s"%val)
 
     elif isinstance(val, list): 
-        return [value(ctx,x) for x in val]
+        return [value(ctx,x,variables,errors) for x in val]
 
     elif isinstance(val, (BNode, Variable)):
         r=ctx.get(val)
@@ -73,7 +73,7 @@ def value(ctx, val, variables=False, errors=False):
             raise NotBoundError
 
     elif isinstance(val, ParseResults) and len(val)==1:
-        return value(ctx,val[0])
+        return value(ctx,val[0],variables,errors)
     else: 
         return val
 

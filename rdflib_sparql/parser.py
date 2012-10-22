@@ -950,8 +950,6 @@ def parseQuery(q):
 if __name__=='__main__':
     import sys
 
-    print Var.parseString("?x")
-
     try: 
         print Query.parseString(sys.argv[1])
     except ParseException, err:

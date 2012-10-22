@@ -116,6 +116,9 @@ class FrozenBindings(collections.Mapping):
 
     def project(self, vars):
         return FrozenBindings(self.ctx, (x for x in self.iteritems() if x[0] in vars))
+
+    def disjointDomain(self, other): 
+        return not bool(set(self).intersection(other))
     
     def compatible(self, other): 
         for k in self: 
@@ -124,6 +127,7 @@ class FrozenBindings(collections.Mapping):
         for k in other:
             if k in self: 
                 if self[k]!=other[k]: return False
+
         return True
     
     def merge(self, other): 

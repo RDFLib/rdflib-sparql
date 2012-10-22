@@ -126,6 +126,7 @@ def evalGraph(ctx, part):
     ctx=ctx.clone()
     graph=ctx[part.term]
     if graph is None:
+        res=[]
         for graph in ctx.dataset.contexts(): 
 
             # in SPARQL the default graph is NOT a named graph
@@ -134,17 +135,16 @@ def evalGraph(ctx, part):
 
             ctx.pushGraph(graph)
             ctx.push()
-            ctx[part.term]=graph.identifier
-            for x in evalPart(ctx, part.p):
-                yield x
+            graphSolution=[{ part.term: graph.identifier }]
+            res+=_join(evalPart(ctx, part.p), graphSolution)
             ctx.pop()
             ctx.popGraph()
+        return res
     else: 
         if not isinstance(ctx.dataset, ConjunctiveGraph): 
             raise Exception("Non-conjunctive-graph doesn't know about graphs!")
         ctx.pushGraph(ctx.dataset.get_context(graph))
-        for x in evalPart(ctx, part.p):
-            yield x
+        return evalPart(ctx, part.p)
         
 def evalMultiset(ctx, part): 
 

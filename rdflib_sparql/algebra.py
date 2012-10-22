@@ -140,7 +140,7 @@ def translateExists(e):
 
     return e
 
-def findFilters(parts):
+def collectAndRemoveFilters(parts):
 
     """
 
@@ -151,10 +151,16 @@ def findFilters(parts):
     """
 
     filters=[]
-    
-    for p in parts:
+
+    i=0
+    while i < len(parts): 
+        p=parts[i]
         if p.name=='Filter':
             filters.append(translateExists(p.expr))
+            parts.pop(i)
+        else: 
+            i+=1
+            
 
     if filters:
         return and_(*filters)
@@ -191,7 +197,7 @@ def translateGroupGraphPattern(graphPattern):
 
     if not graphPattern.part: graphPattern.part=[] # empty { }
 
-    filters=findFilters(graphPattern.part)
+    filters=collectAndRemoveFilters(graphPattern.part)
 
     g=[]
     for p in graphPattern.part: 
@@ -201,7 +207,7 @@ def translateGroupGraphPattern(graphPattern):
                 g.append(BGP())
             g[-1]["triples"]+=triples(p.triples)
         elif p.name=='Bind': 
-            if not g or g[-1].name!='BGP':
+            if not g or g[-1].name not in ('BGP', 'Extend'):
                 g.append(BGP())
             g[-1]=Extend(g[-1], p.expr, p.var)
         else: 
@@ -227,8 +233,6 @@ def translateGroupGraphPattern(graphPattern):
             G=Join(p1=G, p2=p)
         elif p.name in ('BGP', 'Extend'): 
             G=Join(p1=G, p2=p)            
-        elif p.name=='Filter': 
-            pass # already collected above
         else: 
             raise Exception('Unknown part in GroupGraphPattern: %s - %s'%(type(p), p.name))
         
@@ -319,9 +323,15 @@ def _findVars(x, res):
     Find all variables in a tree
     """
     if isinstance(x, Variable): res.add(x)
-    if isinstance(x, CompValue) and x.name=="Bind": 
-        res.add(x.var)
-        return x # stop recursion and finding vars in the expr
+    if isinstance(x, CompValue): 
+        if x.name=="Bind": 
+            res.add(x.var)
+            return x # stop recursion and finding vars in the expr
+        elif x.name=='SubSelect':
+            res.update(x.var or [])
+            res.update(x.evar or [])
+            return x
+                
     
 
 def _sample(e,v=None):
