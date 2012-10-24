@@ -909,21 +909,3 @@ def _lang_range_check(range, lang) :
 
     return all(_match(*x) for x in zip(rangeList, langList))
 
-    # rI = 1
-    # rL = 1
-    # while rI < len(rangeList) :
-    #     if rangeList[rI] == '*' :
-    #         rI += 1
-    #         continue
-    #     if rL >= len(langList) :
-    #         return False
-    #     if _match(rangeList[rI], langList[rL]) :
-    #         rI += 1
-    #         rL += 1
-    #         continue
-    #     if len(langList[rL]) == 1 :
-    #         return False
-    #     else :
-    #         rL += 1
-    #         continue
-    # return True

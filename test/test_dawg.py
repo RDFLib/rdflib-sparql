@@ -8,7 +8,7 @@ from rdflib.query import Result
 from rdflib.compare import isomorphic
 
 from rdflib_sparql.algebra import pprintAlgebra, translateQuery
-from rdflib_sparql.parser import parseQuery
+from rdflib_sparql.parser import parseQuery, parseUpdate
 from rdflib_sparql.results.rdfresults import RDFResultParser
 
 from nose.tools import nottest, eq_ as eq
@@ -23,7 +23,7 @@ DEBUG_ERROR=True
 DEBUG_ERROR=False
 
 SPARQL10Tests=True
-#SPARQL10Tests=False
+SPARQL10Tests=False
 
 SPARQL11Tests=True
 #SPARQL11Tests=False
@@ -136,8 +136,85 @@ def pp_binding(solutions):
     """
     return "\n["+",\n\t".join("{" + ", ".join("%s:%s"%(x[0], x[1].n3()) for x in bindings.items()) + "}" for bindings in solutions)+"]\n"
 
+@nottest 
+def update_test(t): 
+
+    uri, name,comment,data,graphdata,query,resfile,syntax=t
+
+    try: 
+        if syntax:
+            parseUpdate(file(query[7:]))
+        else: 
+            try: 
+                parseUpdate(file(query[7:]))
+                raise AssertionError("Query shouldn't have parsed!")
+            except:
+                pass # negative syntax test
+    except Exception,e:
+
+        if isinstance(e,AssertionError):
+            failed_tests.append(uri)
+            fails[e.message]+=1
+        else:
+            # if isinstance(e, IOError): 
+            #     m=e.message+" "+e.strerror 
+            # else:
+            #     m=e.message
+            error_tests.append(uri)
+            errors[str(e)]+=1
+
+        if DEBUG_ERROR and not isinstance(e,AssertionError) or DEBUG_FAIL: # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
+            print "======================================"
+            print uri
+            print name
+            print comment
+
+            if not resfile: 
+                if syntax: 
+                    print "Positive syntax test"
+                else: 
+                    print "Negative syntax test"
+
+            if data: 
+                print "----------------- DATA --------------------"
+                print ">>>", data
+                print file(data[7:]).read()
+            if graphdata: 
+                print "----------------- GRAPHDATA --------------------"
+                for x in graphdata: 
+                    print ">>>", x
+                    print file(x[7:]).read()
+                
+            print "----------------- Query -------------------"            
+            print ">>>", query
+            print file(query[7:]).read()
+            if resfile:
+                print "----------------- Res -------------------"            
+                print ">>>", resfile
+                print file(resfile[7:]).read()
+
+            try: 
+                pq=parseUpdate(file(query[7:]).read())
+                print "----------------- Parsed ------------------"
+                #pprintAlgebra(translateQuery(pq, base=urljoin(query,'.')))
+                print pq
+            except: 
+                print "(parser error)"
+
+            #import traceback
+            #traceback.print_exc()
+            print e.message.decode('string-escape')
+            
+            import pdb
+            pdb.post_mortem()
+            #pdb.set_trace()
+            #nose.tools.set_trace()
+        raise
+
+
+
 @nottest # gets called by generator
-def do_test_single(t):
+def query_test(t):
     uri, name,comment,data,graphdata,query,resfile,syntax=t
 
     if uri in skiptests:
@@ -317,13 +394,14 @@ def read_manifest(f):
         for col in g.objects(m,MF.entries):
             for e in g.items(col):
 
-
-                
                 if not ((e,DAWG.approval,DAWG.Approved) in g or\
                             (e, DAWG.approval, DAWG.NotClassified) in g): continue
                 
                 t=g.value(e, RDF.type)
-                if t in (UP.UpdateEvaluationTest, MF.ServiceDescriptionTest, MF.PositiveUpdateSyntaxTest11, MF.NegativeUpdateSyntaxTest11, MF.UpdateEvaluationTest, MF.ProtocolTest): continue # skip update tests
+
+                tester=query_test
+                
+                if t in (UP.UpdateEvaluationTest, MF.ServiceDescriptionTest, MF.UpdateEvaluationTest, MF.ProtocolTest): continue # skip update tests
 
                 name=g.value(e, MF.name)
                 comment=g.value(e,RDFS.comment)
@@ -344,11 +422,22 @@ def read_manifest(f):
                     data=None
                     graphdata=None
                     res=None
+                elif t in (MF.PositiveUpdateSyntaxTest11, MF.NegativeUpdateSyntaxTest11):
+                    query=g.value(e, MF.action)
+                    if t==MF.NegativeUpdateSyntaxTest11:
+                        syntax=False
+                    else: 
+                        syntax=True
+                    data=None
+                    graphdata=None
+                    res=None
+                    tester=update_test
+                    
                 else: 
                     print "I dont know DAWG Test Type %s"%t
                     continue
                 
-                yield e, _str(name),_str(comment),_str(data), graphdata, _str(query),_str(res), syntax
+                yield tester, (e, _str(name),_str(comment),_str(data), graphdata, _str(query),_str(res), syntax)
                 
                         
 
@@ -356,11 +445,11 @@ def test_dawg():
 
     if SPARQL10Tests:
         for t in read_manifest("test/DAWG/data-r2/manifest-evaluation.ttl"):
-            yield do_test_single, t
+            yield t
 
     if SPARQL11Tests:
         for t in read_manifest("test/DAWG/data-sparql11/manifest-all.ttl"):
-            yield do_test_single, t
+            yield t
 
 def earl(test, res, info=None): 
     a=BNode()

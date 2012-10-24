@@ -768,13 +768,13 @@ Move = Keyword('MOVE') + _Silent + GraphOrDefault + Keyword('TO') + GraphOrDefau
 Copy = Keyword('COPY') + _Silent + GraphOrDefault + Keyword('TO') + GraphOrDefault
 
 # [38] InsertData ::= 'INSERT DATA' QuadData
-InsertData = Keyword('INSERT DATA') + QuadData
+InsertData = Keyword('INSERT') + Keyword('DATA') + QuadData
 
 # [39] DeleteData ::= 'DELETE DATA' QuadData
-DeleteData = Keyword('DELETE DATA') + QuadData
+DeleteData = Keyword('DELETE') + Keyword('DATA') + QuadData
 
 # [40] DeleteWhere ::= 'DELETE WHERE' QuadPattern
-DeleteWhere = Keyword('DELETE WHERE') + QuadPattern
+DeleteWhere = Keyword('DELETE') + Keyword('WHERE') + QuadPattern
 
 # [42] DeleteClause ::= 'DELETE' QuadPattern
 DeleteClause = Keyword('DELETE') + QuadPattern
@@ -945,6 +945,12 @@ def parseQuery(q):
     if hasattr(q,'read'): q=q.read()
     q=expandUnicodeEscapes(q)
     return Query.parseString(q, parseAll=True)
+
+def parseUpdate(q): 
+    if hasattr(q,'read'): q=q.read()
+    q=expandUnicodeEscapes(q)
+    return Update.parseString(q, parseAll=True)
+    
 
 
 if __name__=='__main__':
