@@ -221,10 +221,16 @@ class QueryContext(object):
         # in SPARQL BNodes are just labels
         if not isinstance(key, (BNode, Variable)):
             return key
-        try:
+        try: 
             return self.bindings[key]
-        except KeyError:
+        except KeyError: 
             return None
+
+    def get(self,key, default=None): 
+        try: 
+            return self[key]
+        except KeyError: 
+            return default
 
     def solution(self,vars=None): 
         """

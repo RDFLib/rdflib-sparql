@@ -83,7 +83,7 @@ def expandBNodeTriples(terms):
             print "1",terms[0]
             print "2",[rdflib.BNode()]+terms.asList()[0]
         return [ expandTriples([rdflib.BNode()]+terms.asList()[0]) ] 
-    except Exception as e: 
+    except Exception, e: 
         if DEBUG:
             print ">>>>>>>>",e
         raise
@@ -930,7 +930,7 @@ expandUnicodeEscapes_re=re.compile(r'\\u([0-9a-f]{4}(?:[0-9a-f]{4})?)', flags=re
 def expandUnicodeEscapes(q):
     """    
     The syntax of the SPARQL Query Language is expressed over code points in Unicode [UNICODE]. The encoding is always UTF-8 [RFC3629].
-    Unicode code points may also be expressed using an \uXXXX (U+0 to U+FFFF) or \UXXXXXXXX syntax (for U+10000 onwards) where X is a hexadecimal digit [0-9A-F]
+    Unicode code points may also be expressed using an \ uXXXX (U+0 to U+FFFF) or \ UXXXXXXXX syntax (for U+10000 onwards) where X is a hexadecimal digit [0-9A-F]
     """
 
     def expand(m):

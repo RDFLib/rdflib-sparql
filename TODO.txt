@@ -1,3 +1,5 @@
 - Literal cmp/hash-values
 
-- Find all vars when 'select *' and no results
+- Confusion around QueryContext vs. FrozenBindings when going up/down algebra tree
+
+- Confusion around CompValue / ListParam vs. pyparsing Group

@@ -244,6 +244,9 @@ def evalAggregateJoin(ctx, agg):
             evalAgg(a,p[row],bindings)
 
         res.append(FrozenBindings(ctx, bindings))
+
+    if len(p)==0: 
+        res.append(FrozenBindings(ctx))
     return res
 
 

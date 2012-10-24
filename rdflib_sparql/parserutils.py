@@ -1,6 +1,10 @@
 
 from types import MethodType
-from collections import OrderedDict
+
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 from pyparsing import TokenConverter, ParseResults
 

@@ -1,5 +1,4 @@
 import collections
-import os.path
 import datetime
 import isodate
 from StringIO import StringIO
@@ -10,14 +9,12 @@ from rdflib.compare import isomorphic
 
 from rdflib_sparql.algebra import pprintAlgebra, translateQuery
 from rdflib_sparql.parser import parseQuery
-from rdflib_sparql.processor import SPARQLProcessor
 from rdflib_sparql.results.rdfresults import RDFResultParser
 
-from nose.tools import eq_ as eq
+from nose.tools import nottest, eq_ as eq
+from nose import SkipTest
 
 from urlparse import urljoin
-
-import nose
 
 DEBUG_FAIL=True
 DEBUG_FAIL=False
@@ -26,7 +23,7 @@ DEBUG_ERROR=True
 DEBUG_ERROR=False
 
 SPARQL10Tests=True
-SPARQL10Tests=False
+#SPARQL10Tests=False
 
 SPARQL11Tests=True
 #SPARQL11Tests=False
@@ -51,8 +48,9 @@ errors=collections.Counter()
 failed_tests=[]
 error_tests=[]
 
-
 EARL_REPORT=Graph()
+
+
 
 rdflib_sparql=URIRef('https://github.com/gromgull/rdflib-sparql')
 
@@ -65,6 +63,10 @@ EARL_REPORT.add((me, RDF.type, FOAF.Person))
 EARL_REPORT.add((me, FOAF.homepage, URIRef("http://gromgull.net")))
 EARL_REPORT.add((me, FOAF.name, Literal("Gunnar Aastrand Grimnes")))
 
+try:
+    skiptests=dict([(URIRef(x.strip().split("\t")[0]), x.strip().split("\t")[1]) for x in file("skiptests.list")])
+except IOError:
+    skiptests=set()
 
 
 def _fmt(f):
@@ -134,8 +136,12 @@ def pp_binding(solutions):
     """
     return "\n["+",\n\t".join("{" + ", ".join("%s:%s"%(x[0], x[1].n3()) for x in bindings.items()) + "}" for bindings in solutions)+"]\n"
 
+@nottest # gets called by generator
 def do_test_single(t):
     uri, name,comment,data,graphdata,query,resfile,syntax=t
+
+    if uri in skiptests:
+        raise SkipTest()
 
     def skip(reason='(none)'): 
         print "Skipping %s from now on."%uri
@@ -155,7 +161,6 @@ def do_test_single(t):
                        format=_fmt(x))
 
 
-        s=SPARQLProcessor(g)
 
         if not resfile: 
             # no result - syntax test
@@ -173,7 +178,7 @@ def do_test_single(t):
             return
 
         # eval test - carry out query
-        res2=s.query(file(query[7:]).read(), base=urljoin(query,'.'))
+        res2=g.query(file(query[7:]).read(), base=urljoin(query,'.'))
 
         if resfile.endswith('ttl'):
             resg=Graph()
@@ -311,6 +316,8 @@ def read_manifest(f):
 
         for col in g.objects(m,MF.entries):
             for e in g.items(col):
+
+
                 
                 if not ((e,DAWG.approval,DAWG.Approved) in g or\
                             (e, DAWG.approval, DAWG.NotClassified) in g): continue
@@ -347,8 +354,9 @@ def read_manifest(f):
 
 def test_dawg():
 
-    for t in read_manifest("test/DAWG/data-r2/manifest-evaluation.ttl"):
-        yield do_test_single, t
+    if SPARQL10Tests:
+        for t in read_manifest("test/DAWG/data-r2/manifest-evaluation.ttl"):
+            yield do_test_single, t
 
     if SPARQL11Tests:
         for t in read_manifest("test/DAWG/data-sparql11/manifest-all.ttl"):
@@ -380,24 +388,20 @@ if __name__=='__main__':
     i=0
     success=0
 
-    try:
-        skiptests=dict([(URIRef(x.strip().split("\t")[0]), x.strip().split("\t")[1]) for x in file("skiptests.list")])
-    except IOError:
-        skiptests=set()
-
     skip=0
     for f, t in test_dawg():
         if NAME and not str(t[0]).startswith(NAME): continue
         i+=1
-        if t[0] in skiptests:
-            earl(t[0], "untested",skiptests[t[0]])
-            print "skipping %s - %s"%(t[0],skiptests[t[0]])
-            skip+=1
-            continue
         try: 
             f(t)
             earl(t[0], "passed")
             success+=1
+
+        except SkipTest:
+            earl(t[0], "untested",skiptests[t[0]])
+            print "skipping %s - %s"%(t[0],skiptests[t[0]])
+            skip+=1
+
         except KeyboardInterrupt: 
             raise
         except AssertionError:

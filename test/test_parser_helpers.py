@@ -1,5 +1,5 @@
 from rdflib_sparql.parser import BlankNodePropertyList, TriplesSameSubject
-from rdflib_sparql.evaluate import triples
+from rdflib_sparql.algebra import triples
 
 def pt(ts):
     for t in ts:
@@ -36,5 +36,5 @@ def test_1():
     print t6, len(t6)
     assert len(t6)%3 == 0 
 
-    raise
+
 

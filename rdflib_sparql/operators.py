@@ -684,10 +684,10 @@ def RelationalExpression(e, ctx):
         for x in other: 
             try: 
                 if x==expr: return Literal(True ^ res)
-            except: 
-                error=True
+            except SPARQLError, e: 
+                error=e
         if not error: return Literal(False ^ res)
-        else: return SPARQLError()
+        else: raise error
 
 
     if type(expr)!=type(other): raise SPARQLError('Comparing different types of RDF terms is an error!')
@@ -760,7 +760,7 @@ def ConditionalOrExpression(e, ctx):
         try: 
             if EBV(x):
                 return Literal(True)
-        except SPARQLError,e:
+        except SPARQLError, e:
             error=e
     if error: 
         raise error
@@ -881,49 +881,49 @@ def EBV(rt):
 
 
 def _lang_range_check(range, lang) :
-	"""
-	Implementation of the extended filtering algorithm, as defined in point 3.3.2,
-	of U{RFC 4647<http://www.rfc-editor.org/rfc/rfc4647.txt>}, on matching language ranges and language tags.
-	Needed to handle the C{rdf:PlainLiteral} datatype.
-	@param range: language range
-	@param lang: language tag
-	@rtype: boolean
+    """
+    Implementation of the extended filtering algorithm, as defined in point 3.3.2,
+    of U{RFC 4647<http://www.rfc-editor.org/rfc/rfc4647.txt>}, on matching language ranges and language tags.
+    Needed to handle the C{rdf:PlainLiteral} datatype.
+    @param range: language range
+    @param lang: language tag
+    @rtype: boolean
 
         @author: U{Ivan Herman<a href="http://www.w3.org/People/Ivan/">}
 
         Taken from http://dev.w3.org/2004/PythonLib-IH/RDFClosure/RestrictedDatatype.py
 
-	"""
-	def _match(r,l) :
-		"""Matching of a range and language item: either range is a wildcard or the two are equal
-		@param r: language range item
-		@param l: language tag item
-		@rtype: boolean
-		"""
-		return r == '*' or r == l
-	
-	rangeList = range.strip().lower().split('-')
-	langList  = lang.strip().lower().split('-')
-	if not _match(rangeList[0], langList[0]) : return False
-        if len(rangeList)>len(langList): return False 
+    """
+    def _match(r,l) :
+        """Matching of a range and language item: either range is a wildcard or the two are equal
+        @param r: language range item
+        @param l: language tag item
+        @rtype: boolean
+        """
+        return r == '*' or r == l
+    
+    rangeList = range.strip().lower().split('-')
+    langList  = lang.strip().lower().split('-')
+    if not _match(rangeList[0], langList[0]) : return False
+    if len(rangeList)>len(langList): return False 
 
-	return all(_match(*x) for x in zip(rangeList, langList))
+    return all(_match(*x) for x in zip(rangeList, langList))
 
-	# rI = 1
-	# rL = 1
-	# while rI < len(rangeList) :
-	# 	if rangeList[rI] == '*' :
-	# 		rI += 1
-	# 		continue
-	# 	if rL >= len(langList) :
-	# 		return False
-	# 	if _match(rangeList[rI], langList[rL]) :
-	# 		rI += 1
-	# 		rL += 1
-	# 		continue
-	# 	if len(langList[rL]) == 1 :
-	# 		return False
-	# 	else :
-	# 		rL += 1
-	# 		continue
-	# return True
+    # rI = 1
+    # rL = 1
+    # while rI < len(rangeList) :
+    #     if rangeList[rI] == '*' :
+    #         rI += 1
+    #         continue
+    #     if rL >= len(langList) :
+    #         return False
+    #     if _match(rangeList[rI], langList[rL]) :
+    #         rI += 1
+    #         rL += 1
+    #         continue
+    #     if len(langList[rL]) == 1 :
+    #         return False
+    #     else :
+    #         rL += 1
+    #         continue
+    # return True

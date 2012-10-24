@@ -100,3 +100,6 @@
 2012-10-22T12:55:48
 593 tests, 511 passed, 2 failed, 0 errors, 80 skipped (86.17% success)
 
+2012-10-24T09:35:45
+593 tests, 512 passed, 1 failed, 0 errors, 80 skipped (86.34% success)
+
