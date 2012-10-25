@@ -1,5 +1,6 @@
 
 import functools
+import collections
 
 from rdflib import Literal, Variable, URIRef
 
@@ -505,22 +506,82 @@ def simplify(n):
         if n.p2.name=='BGP' and len(n.p2.triples)==0:
             return n.p1
 
+def translatePrologue(p, base, prologue=None): 
+
+    if prologue is None:
+        prologue=Prologue()
+        prologue.base=""
+    if base:
+        prologue.base=base
+
+    for x in p:
+        if x.name=='Base': 
+            prologue.base=x.iri
+        elif x.name=='PrefixDecl':
+            prologue.bind(x.prefix, prologue.absolutize(x.iri))
+
+    return prologue
+
+def translateQuads(quads): 
+    if quads.triples:
+        alltriples=triples(quads.triples)
+    else: 
+        alltriples=[]
+
+
+    allquads=collections.defaultdict(list)
     
+    if quads.quadsNotTriples:
+        for q in quads.quadsNotTriples:        
+            if q.triples:
+                allquads[q.term]+=triples(q.triples)
+    
+    return alltriples, allquads
+
+def translateUpdate1(u, prologue): 
+    if u.name in ('Load', 'Clear', 'Drop', 'Create'):
+        pass # no translation needed
+    elif u.name in ('Add', 'Move', 'Copy'):
+        pass
+    elif u.name in ('InsertData', 'DeleteData', 'DeleteWhere'): 
+        t,q=translateQuads(u.quads)
+        u["quads"]=q
+        u["triples"]=t
+        if u.name in ('DeleteWhere', 'DeleteData'):
+            pass  # TODO: check for bnodes in triples
+    elif u.name == 'Modify': 
+        if u.delete: 
+            u.delete["quads"]=translateQuads(u.delete.quads)
+        if u.insert: 
+            u.insert["quads"]=translateQuads(u.insert.quads)
+        u["where"]=translateGroupGraphPattern(u.where)
+    else: 
+        raise Exception('Unknown type of update operation: %s'%u)
+
+    return u
+
+def translateUpdate(q, base=None): 
+    res=[]
+    prologue=None
+    for p,u in zip(q.prologue, q.request or [None]): 
+        prologue=translatePrologue(p, base, prologue)
+
+        if u is None: continue
+        # absolutize/resolve prefixes
+        u=traverse(u, visitPost=functools.partial(translatePName, prologue=prologue))
+
+        res.append(translateUpdate1(u,prologue))
+    
+    return res
+
+
 def translateQuery(q, base=None): 
     """
     We get in: 
     (prologue, query)
     """
     
-    prologue=Prologue()
-    if base:
-        prologue.base=base
-
-    for x in q[0]:
-        if x.name=='Base': 
-            prologue.base=x.iri
-        elif x.name=='PrefixDecl':
-            prologue.bind(x.prefix, prologue.absolutize(x.iri))
+    prologue=translatePrologue(q[0], base)
 
     # absolutize/resolve prefixes
     q[1]=traverse(q[1], visitPost=functools.partial(translatePName, prologue=prologue))

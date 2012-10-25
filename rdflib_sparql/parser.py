@@ -3,7 +3,7 @@ import re
 import traceback
 
 from pyparsing import Literal, Regex, Optional, OneOrMore, ZeroOrMore, \
-    Forward, ParseException, Suppress, Combine, restOfLine, Group, Empty, ParseResults
+    Forward, ParseException, Suppress, Combine, restOfLine, Group, Empty, ParseResults, delimitedList
 from pyparsing import CaselessKeyword as Keyword # watch out :) 
 #from pyparsing import Keyword as CaseSensitiveKeyword 
 
@@ -334,13 +334,13 @@ VarOrTerm = Var | GraphTerm
 VarOrIri = Var | iri
 
 # [46] GraphRef ::= 'GRAPH' iri
-GraphRef = Comp('GraphRef', Keyword('GRAPH') + Param('iri', iri))
+GraphRef = Keyword('GRAPH') + Param('graphiri', iri)
 
 # [47] GraphRefAll ::= GraphRef | 'DEFAULT' | 'NAMED' | 'ALL'
-GraphRefAll = Comp('GraphRef', GraphRef | Param('special', Keyword('DEFAULT') | Keyword('NAMED') | Keyword('ALL')))
+GraphRefAll = GraphRef | Param('graphiri', Keyword('DEFAULT')) | Param('graphiri', Keyword('NAMED')) | Param('graphiri', Keyword('ALL'))
 
 # [45] GraphOrDefault ::= 'DEFAULT' | 'GRAPH'? iri
-GraphOrDefault = Comp('GraphRef', Param('special', Keyword('DEFAULT')) | Optional(Keyword('GRAPH')) + Param('iri', iri))
+GraphOrDefault = ParamList('graph', Keyword('DEFAULT')) | Optional(Keyword('GRAPH')) + ParamList('graph', iri)
 
 # [65] DataBlockValue ::= iri | RDFLiteral | NumericLiteral | BooleanLiteral | 'UNDEF'
 DataBlockValue = iri | RDFLiteral | NumericLiteral | BooleanLiteral | Keyword('UNDEF')
@@ -410,7 +410,6 @@ ObjectPath = GraphNodePath
 ObjectListPath = ObjectPath + ZeroOrMore( ',' + ObjectPath )
 
 
-
 GroupGraphPattern = Forward()
 
 
@@ -438,6 +437,7 @@ PropertyListPath = Optional(PropertyListPathNotEmpty)
 # [77] PropertyListNotEmpty ::= Verb ObjectList ( ';' ( Verb ObjectList )? )*
 PropertyListNotEmpty = Verb + ObjectList + ZeroOrMore( ';' + Optional( Verb + ObjectList ) )
 
+
 # [76] PropertyList ::= Optional(PropertyListNotEmpty)
 PropertyList = Optional(PropertyListNotEmpty)
 
@@ -464,16 +464,16 @@ TriplesTemplate = Forward()
 TriplesTemplate << ( ParamList('triples', TriplesSameSubject) + Optional( Suppress('.') + Optional(TriplesTemplate) ) )
 
 # [51] QuadsNotTriples ::= 'GRAPH' VarOrIri '{' Optional(TriplesTemplate) '}'
-QuadsNotTriples = Keyword('GRAPH') + VarOrIri + Group ( '{' +  Optional(TriplesTemplate)  + '}' )
+QuadsNotTriples = Comp('QuadsNotTriples', Keyword('GRAPH') + Param('term', VarOrIri) + '{' +  Optional(TriplesTemplate)  + '}' )
 
 # [50] Quads ::= Optional(TriplesTemplate) ( QuadsNotTriples '.'? Optional(TriplesTemplate) )*
-Quads = Optional(TriplesTemplate) + ZeroOrMore( QuadsNotTriples + Optional(Suppress('.')) + Optional(TriplesTemplate) )
+Quads = Comp('Quads', Optional(TriplesTemplate) + ZeroOrMore( ParamList('quadsNotTriples', QuadsNotTriples) + Optional(Suppress('.')) + Optional(TriplesTemplate )))
 
 # [48] QuadPattern ::= '{' Quads '}'
-QuadPattern = '{' + Quads + '}'
+QuadPattern = '{' + Param('quads', Quads) + '}'
 
 # [49] QuadData ::= '{' Quads '}'
-QuadData = '{' + Quads + '}'
+QuadData = '{' + Param('quads', Quads) + '}'
 
 # [81] TriplesSameSubjectPath ::= VarOrTerm PropertyListPathNotEmpty | TriplesNodePath PropertyListPath
 TriplesSameSubjectPath = VarOrTerm + PropertyListPathNotEmpty | TriplesNodePath + PropertyListPath
@@ -495,7 +495,7 @@ GroupOrUnionGraphPattern = Comp('GroupOrUnionGraphPattern', ParamList('graph', G
 Expression = Forward()
 
 # [72] ExpressionList ::= NIL | '(' Expression ( ',' Expression )* ')'
-ExpressionList = NIL | Group(Suppress('(') + Expression + ZeroOrMore( Suppress(',') + Expression ) + Suppress(')') )
+ExpressionList = NIL | Group(Suppress('(') + delimitedList(Expression) + Suppress(')') )
 
 # [122] RegexExpression ::= 'REGEX' '(' Expression ',' Expression ( ',' Expression )? ')'
 RegexExpression = Comp('Builtin_REGEX',Keyword('REGEX') + '(' + Param('text',Expression) + ',' + Param('pattern',Expression) + Optional( ',' + Param('flags',Expression) ) + ')')
@@ -646,7 +646,7 @@ BuiltInCall = Aggregate \
     | NotExistsFunc
 
 # [71] ArgList ::= NIL | '(' 'DISTINCT'? Expression ( ',' Expression )* ')'
-ArgList = NIL | '(' + Param('distinct', _Distinct) + ParamList('expr', Expression) + ZeroOrMore( ',' + ParamList('iri', Expression) ) + ')'
+ArgList = NIL | '(' + Param('distinct', _Distinct) + delimitedList(ParamList('expr', Expression)) + ')'
 
 # [128] iriOrFunction ::= iri Optional(ArgList)
 iriOrFunction = ( Comp('Function', Param('iri', iri) + ArgList).setEvalFn(op.Function) ) | iri
@@ -747,46 +747,46 @@ GroupClause = Comp('GroupClause', Keyword('GROUP') + Keyword('BY') + OneOrMore(P
 _Silent = Optional(Param('silent', Keyword('SILENT')))
 
 # [31] Load ::= 'LOAD' 'SILENT'? iri ( 'INTO' GraphRef )?
-Load = Keyword('LOAD') + _Silent + iri + Optional( Keyword('INTO') + GraphRef )
+Load = Comp('Load', Keyword('LOAD') + _Silent + Param('iri', iri) + Optional( Keyword('INTO') + GraphRef ))
 
 # [32] Clear ::= 'CLEAR' 'SILENT'? GraphRefAll
-Clear = Keyword('CLEAR') + _Silent + GraphRefAll
+Clear = Comp('Clear', Keyword('CLEAR') + _Silent + GraphRefAll)
 
 # [33] Drop ::= 'DROP' _Silent GraphRefAll
-Drop = Keyword('DROP') + _Silent + GraphRefAll
+Drop = Comp('Drop', Keyword('DROP') + _Silent + GraphRefAll)
 
 # [34] Create ::= 'CREATE' _Silent GraphRef
-Create = Keyword('CREATE') + _Silent + GraphRef
+Create = Comp('Create', Keyword('CREATE') + _Silent + GraphRef)
 
 # [35] Add ::= 'ADD' _Silent GraphOrDefault 'TO' GraphOrDefault
-Add = Keyword('ADD') + _Silent + GraphOrDefault + Keyword('TO') + GraphOrDefault
+Add = Comp('Add', Keyword('ADD') + _Silent + GraphOrDefault + Keyword('TO') + GraphOrDefault)
 
 # [36] Move ::= 'MOVE' _Silent GraphOrDefault 'TO' GraphOrDefault
-Move = Keyword('MOVE') + _Silent + GraphOrDefault + Keyword('TO') + GraphOrDefault
+Move = Comp('Move', Keyword('MOVE') + _Silent + GraphOrDefault + Keyword('TO') + GraphOrDefault)
 
 # [37] Copy ::= 'COPY' _Silent GraphOrDefault 'TO' GraphOrDefault
-Copy = Keyword('COPY') + _Silent + GraphOrDefault + Keyword('TO') + GraphOrDefault
+Copy = Comp('Copy', Keyword('COPY') + _Silent + GraphOrDefault + Keyword('TO') + GraphOrDefault)
 
 # [38] InsertData ::= 'INSERT DATA' QuadData
-InsertData = Keyword('INSERT') + Keyword('DATA') + QuadData
+InsertData = Comp('InsertData', Keyword('INSERT') + Keyword('DATA') + QuadData)
 
 # [39] DeleteData ::= 'DELETE DATA' QuadData
-DeleteData = Keyword('DELETE') + Keyword('DATA') + QuadData
+DeleteData = Comp('DeleteData', Keyword('DELETE') + Keyword('DATA') + QuadData)
 
 # [40] DeleteWhere ::= 'DELETE WHERE' QuadPattern
-DeleteWhere = Keyword('DELETE') + Keyword('WHERE') + QuadPattern
+DeleteWhere = Comp('DeleteWhere', Keyword('DELETE') + Keyword('WHERE') + QuadPattern)
 
 # [42] DeleteClause ::= 'DELETE' QuadPattern
-DeleteClause = Keyword('DELETE') + QuadPattern
+DeleteClause = Comp('DeleteClause', Keyword('DELETE') + QuadPattern)
 
 # [43] InsertClause ::= 'INSERT' QuadPattern
-InsertClause = Keyword('INSERT') + QuadPattern
+InsertClause = Comp('InsertClause', Keyword('INSERT') + QuadPattern)
 
 # [44] UsingClause ::= 'USING' ( iri | 'NAMED' iri )
-UsingClause = Keyword('USING') + ( iri | Keyword('NAMED') + iri )
+UsingClause = Comp('UsingClause', Keyword('USING') + ( Param('default', iri) | Keyword('NAMED') + Param('named', iri) ))
 
 # [41] Modify ::= ( 'WITH' iri )? ( DeleteClause Optional(InsertClause) | InsertClause ) ZeroOrMore(UsingClause) 'WHERE' GroupGraphPattern
-Modify = Optional( Keyword('WITH') + iri ) + ( DeleteClause + Optional(InsertClause) | InsertClause ) + ZeroOrMore(UsingClause) + Keyword('WHERE') + GroupGraphPattern
+Modify = Comp('Modify', Optional( Keyword('WITH') + iri ) + ( Param('delete', DeleteClause) + Optional(Param('insert', InsertClause)) | Param('insert', InsertClause) ) + ZeroOrMore(ParamList('using', UsingClause)) + Keyword('WHERE') + Param('where', GroupGraphPattern))
 
 
 # [30] Update1 ::= Load | Clear | Drop | Add | Move | Copy | Create | InsertData | DeleteData | DeleteWhere | Modify
@@ -904,7 +904,7 @@ DescribeQuery = Comp('DescribeQuery', Keyword('DESCRIBE') + (OneOrMore(ParamList
 
 # [29] Update ::= Prologue ( Update1 ( ';' Update )? )?
 Update = Forward()
-Update << ( Prologue + Optional( Update1 + Optional( ';' + Update ) ) ) 
+Update << (ParamList('prologue',  Prologue) + Optional( ParamList('request', Update1) + Optional( ';' + Update )) )
 
 
 # [2] Query ::= Prologue
@@ -914,7 +914,7 @@ Update << ( Prologue + Optional( Update1 + Optional( ';' + Update ) ) )
 Query = Prologue + ( SelectQuery | ConstructQuery | DescribeQuery | AskQuery ) 
 
 # [3] UpdateUnit ::= Update
-UpdateUnit = Update
+UpdateUnit = Comp('Update', Update)
 
 # [1] QueryUnit ::= Query
 QueryUnit = Query
@@ -949,7 +949,7 @@ def parseQuery(q):
 def parseUpdate(q): 
     if hasattr(q,'read'): q=q.read()
     q=expandUnicodeEscapes(q)
-    return Update.parseString(q, parseAll=True)
+    return UpdateUnit.parseString(q, parseAll=True)[0]
     
 
 

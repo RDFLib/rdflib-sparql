@@ -1,5 +1,6 @@
+import collections
 
-from rdflib import Variable, Literal
+from rdflib import Variable, Literal, BNode
 
 from rdflib_sparql.operators import EBV
 from rdflib_sparql.parserutils import Expr, CompValue
@@ -79,3 +80,29 @@ def _filter(a,expr):
     for c in a:
         if _ebv(expr, c):
             yield c
+
+
+def _fillTemplate(template, solution): 
+
+    """
+    For construct/deleteWhere and friends
+
+    Fill a triple template with instantiated variables
+    """
+
+    bnodeMap=collections.defaultdict(BNode) 
+    for t in template:
+        s,p,o=t
+
+        _s=solution.get(s)
+        _p=solution.get(p)
+        _o=solution.get(o)
+
+        # instantiate new bnodes for each solution
+        _s,_p,_o=[bnodeMap[x] if isinstance(x,BNode) else y for x,y in zip(t,(_s,_p,_o))]
+
+        if _s is not None and \
+                _p is not None and \
+                _o is not None:
+
+            yield (_s,_p,_o)

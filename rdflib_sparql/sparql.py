@@ -172,10 +172,10 @@ class QueryContext(object):
     def __init__(self, graph=None): 
         self.bindings=Bindings()
         if isinstance(graph, ConjunctiveGraph): 
-            self.dataset=graph
+            self._dataset=graph
             self._graph=[self.dataset.default_context]
         else: 
-            self.dataset=None
+            self._dataset=None
             self._graph=[graph]
         self.prologue=None
         self.now=datetime.datetime.now()
@@ -183,7 +183,7 @@ class QueryContext(object):
         self.bnodes=collections.defaultdict(BNode)
 
     def clone(self): 
-        r=QueryContext(self.dataset)
+        r=QueryContext(self._dataset or self._graph)
         r.prologue=self.prologue
         r.bindings.update(self.bindings)
         r._graph=list(self._graph)
@@ -195,19 +195,26 @@ class QueryContext(object):
 
     graph=property(_get_graph, doc="current graph")
 
-    def load(self, source, default=False): 
+    def _get_dataset(self): 
+        if self._dataset is None: 
+            raise Exception('You performed a query operation requiring a dataset (i.e. ConjunctiveGraph), but operating currently on a single graph.')
+        return self._dataset
+
+    dataset=property(_get_dataset, doc="current dataset")
+
+    def load(self, source, default=False, **kwargs): 
 
         def _load(graph, source): 
             try: 
-                return graph.load(source)
+                return graph.load(source, **kwargs)
             except: 
                 pass
             try: 
-                return graph.load(source, format='n3')
+                return graph.load(source, format='n3', **kwargs)
             except:
                 pass
             try:
-                return graph.load(source, format='nt')
+                return graph.load(source, format='nt', **kwargs)
             except:
                 raise Exception("Could not load %s as either RDF/XML, N3 or NTriples"%source)
 

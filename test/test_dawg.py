@@ -1,3 +1,10 @@
+import sys
+
+# Needed to pass
+# http://www.w3.org/2009/sparql/docs/tests/data-sparql11/syntax-update-2/manifest#syntax-update-other-01
+sys.setrecursionlimit(6000) # default is 1000
+
+
 import collections
 import datetime
 import isodate
@@ -7,9 +14,10 @@ from rdflib import ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef, BNode,
 from rdflib.query import Result
 from rdflib.compare import isomorphic
 
-from rdflib_sparql.algebra import pprintAlgebra, translateQuery
+from rdflib_sparql.algebra import pprintAlgebra, translateQuery, translateUpdate
 from rdflib_sparql.parser import parseQuery, parseUpdate
 from rdflib_sparql.results.rdfresults import RDFResultParser
+from rdflib_sparql.update import evalUpdate
 
 from nose.tools import nottest, eq_ as eq
 from nose import SkipTest
@@ -139,37 +147,69 @@ def pp_binding(solutions):
 @nottest 
 def update_test(t): 
 
-    uri, name,comment,data,graphdata,query,resfile,syntax=t
+    uri, name,comment,data,graphdata,query,res,syntax=t
 
     try: 
-        if syntax:
-            parseUpdate(file(query[7:]))
-        else: 
-            try: 
-                parseUpdate(file(query[7:]))
-                raise AssertionError("Query shouldn't have parsed!")
-            except:
-                pass # negative syntax test
+        g=ConjunctiveGraph()
+
+        if not res:
+            if syntax:
+                translateUpdate(parseUpdate(file(query[7:])))
+            else: 
+                try: 
+                    translateUpdate(parseUpdate(file(query[7:])))
+                    raise AssertionError("Query shouldn't have parsed!")
+                except:
+                    pass # negative syntax test
+            return
+        
+        resdata,resgraphdata=res
+
+        # read input graphs
+        if data:
+            g.default_context.load(data, format=_fmt(data))
+
+        if graphdata:
+            for x,l in graphdata:
+                g.load(x, publicID=URIRef(l), format=_fmt(x))
+
+        req=translateUpdate(parseUpdate(file(query[7:])))
+        evalUpdate(g,req)
+        
+
+        # read expected results
+
+        resg=ConjunctiveGraph()
+        if resdata:
+            resg.default_context.load(resdata, format=_fmt(resdata))
+
+        if resgraphdata:
+            for x,l in resgraphdata:
+                resg.load(x, publicID=URIRef(l), format=_fmt(x))
+        
+        eq(set(x.identifier for x in g.contexts() if x!=g.default_context),
+           set(x.identifier for x in resg.contexts() if x!=resg.default_context))
+        assert isomorphic(g.default_context,resg.default_context)
+        for x in g.contexts(): 
+            if x==g.default_context: continue
+            assert isomorphic(x, resg.get_context(x.identifier)), "Graphs with ID %s are not isomorphic"%x.identifier
+            
     except Exception,e:
 
         if isinstance(e,AssertionError):
             failed_tests.append(uri)
             fails[e.message]+=1
         else:
-            # if isinstance(e, IOError): 
-            #     m=e.message+" "+e.strerror 
-            # else:
-            #     m=e.message
             error_tests.append(uri)
             errors[str(e)]+=1
 
-        if DEBUG_ERROR and not isinstance(e,AssertionError) or DEBUG_FAIL: # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
+        if DEBUG_ERROR and not isinstance(e,AssertionError) or DEBUG_FAIL: 
             print "======================================"
             print uri
             print name
             print comment
 
-            if not resfile: 
+            if not res: 
                 if syntax: 
                     print "Positive syntax test"
                 else: 
@@ -181,34 +221,46 @@ def update_test(t):
                 print file(data[7:]).read()
             if graphdata: 
                 print "----------------- GRAPHDATA --------------------"
-                for x in graphdata: 
-                    print ">>>", x
+                for x,l in graphdata: 
+                    print ">>>", x, l
                     print file(x[7:]).read()
                 
-            print "----------------- Query -------------------"            
+            print "----------------- Request -------------------"            
             print ">>>", query
             print file(query[7:]).read()
-            if resfile:
-                print "----------------- Res -------------------"            
-                print ">>>", resfile
-                print file(resfile[7:]).read()
+
+
+            if res: 
+                if resdata: 
+                    print "----------------- RES DATA --------------------"
+                    print ">>>", resdata
+                    print file(resdata[7:]).read()
+                if resgraphdata: 
+                    print "----------------- RES GRAPHDATA --------------------"
+                    for x,l in resgraphdata: 
+                        print ">>>", x, l
+                        print file(x[7:]).read()
+
+            print "------------- MY RESULT ----------"
+            print g.serialize(format='trig')
+
+            # if resfile:
+            #     print "----------------- Res -------------------"            
+            #     print ">>>", resfile
+            #     print file(resfile[7:]).read()
 
             try: 
-                pq=parseUpdate(file(query[7:]).read())
+                pq=translateUpdate(parseUpdate(file(query[7:]).read()))
                 print "----------------- Parsed ------------------"
                 #pprintAlgebra(translateQuery(pq, base=urljoin(query,'.')))
                 print pq
             except: 
                 print "(parser error)"
 
-            #import traceback
-            #traceback.print_exc()
             print e.message.decode('string-escape')
             
             import pdb
             pdb.post_mortem()
-            #pdb.set_trace()
-            #nose.tools.set_trace()
         raise
 
 
@@ -233,11 +285,7 @@ def query_test(t):
 
         if graphdata:
             for x in graphdata:
-                g.load(x, 
-#                       publicID=URIRef('http://ba.se/'+os.path.basename(x)),
-                       format=_fmt(x))
-
-
+                g.load(x, format=_fmt(x))
 
         if not resfile: 
             # no result - syntax test
@@ -318,14 +366,10 @@ def query_test(t):
             failed_tests.append(uri)
             fails[e.message]+=1
         else:
-            # if isinstance(e, IOError): 
-            #     m=e.message+" "+e.strerror 
-            # else:
-            #     m=e.message
             error_tests.append(uri)
             errors[str(e)]+=1
 
-        if DEBUG_ERROR and not isinstance(e,AssertionError) or DEBUG_FAIL: # and res.type=='CONSTRUCT' or res2.type=='CONSTRUCT':
+        if DEBUG_ERROR and not isinstance(e,AssertionError) or DEBUG_FAIL: 
             print "======================================"
             print uri
             print name
@@ -401,7 +445,7 @@ def read_manifest(f):
 
                 tester=query_test
                 
-                if t in (UP.UpdateEvaluationTest, MF.ServiceDescriptionTest, MF.UpdateEvaluationTest, MF.ProtocolTest): continue # skip update tests
+                if t in (MF.ServiceDescriptionTest, MF.ProtocolTest): continue # skip tests we do not know
 
                 name=g.value(e, MF.name)
                 comment=g.value(e,RDFS.comment)
@@ -413,6 +457,26 @@ def read_manifest(f):
                     graphdata=list(g.objects(a, QT.graphData))
                     res=g.value(e, MF.result)
                     syntax=True
+                elif t in (MF.UpdateEvaluationTest, UP.UpdateEvaluationTest): 
+                    a=g.value(e, MF.action)
+                    query=g.value(a,UP.request)
+                    data=g.value(a, UP.data)
+                    graphdata=[]
+                    for gd in g.objects(a, UP.graphData):
+                        graphdata.append((g.value(gd, UP.graph),
+                                          g.value(gd, RDFS.label)))
+
+                    r=g.value(e, MF.result)
+                    resdata=g.value(r, UP.data)
+                    resgraphdata=[]
+                    for gd in g.objects(r, UP.graphData):
+                        resgraphdata.append((g.value(gd, UP.graph),
+                                          g.value(gd, RDFS.label)))
+                    
+                    res=resdata,resgraphdata
+                    syntax=True
+                    tester=update_test
+
                 elif t in (MF.NegativeSyntaxTest11, MF.PositiveSyntaxTest11):
                     query=g.value(e, MF.action)
                     if t==MF.NegativeSyntaxTest11:
@@ -422,6 +486,7 @@ def read_manifest(f):
                     data=None
                     graphdata=None
                     res=None
+
                 elif t in (MF.PositiveUpdateSyntaxTest11, MF.NegativeUpdateSyntaxTest11):
                     query=g.value(e, MF.action)
                     if t==MF.NegativeUpdateSyntaxTest11:
@@ -437,7 +502,7 @@ def read_manifest(f):
                     print "I dont know DAWG Test Type %s"%t
                     continue
                 
-                yield tester, (e, _str(name),_str(comment),_str(data), graphdata, _str(query),_str(res), syntax)
+                yield tester, (e, _str(name),_str(comment),_str(data), graphdata, _str(query),res, syntax)
                 
                         
 

@@ -1,10 +1,10 @@
 import collections
 
-from rdflib import Variable, Graph, ConjunctiveGraph, BNode
+from rdflib import Variable, Graph, BNode
 
 from rdflib_sparql.parserutils import value
 from rdflib_sparql.sparql import QueryContext, AlreadyBound, FrozenBindings, SPARQLError
-from rdflib_sparql.evalutils import _filter, _eval, _join, _diff, _minus
+from rdflib_sparql.evalutils import _filter, _eval, _join, _diff, _minus, _fillTemplate
 
 from rdflib_sparql.aggregates import evalAgg
 
@@ -327,22 +327,7 @@ def evalConstructQuery(ctx, query):
     graph=Graph()
 
     for c in evalPart(ctx, query.p):
-        bnodeMap=collections.defaultdict(BNode) 
-        for t in template:
-            s,p,o=t
-
-            _s=c.get(s)
-            _p=c.get(p)
-            _o=c.get(o)
-
-            # instantiate new bnodes for each solution
-            _s,_p,_o=[bnodeMap[x] if isinstance(x,BNode) else y for x,y in zip(t,(_s,_p,_o))]
-
-            if _s is not None and \
-                    _p is not None and \
-                    _o is not None:
-
-                graph.add((_s,_p,_o))
+        graph+=_fillTemplate(template, c)
 
     res={}
     res["type_"]="CONSTRUCT"

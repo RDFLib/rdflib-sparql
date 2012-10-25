@@ -109,3 +109,27 @@
 2012-10-24T14:55:41
 414 tests, 359 passed, 1 failed, 1 errors, 53 skipped (86.71% success)
 
+2012-10-25T09:30:15
+414 tests, 357 passed, 2 failed, 2 errors, 53 skipped (86.23% success)
+
+2012-10-25T14:01:55
+414 tests, 361 passed, 0 failed, 0 errors, 53 skipped (87.20% success)
+
+2012-10-25T14:06:20
+507 tests, 368 passed, 86 failed, 0 errors, 53 skipped (72.58% success)
+
+2012-10-25T14:45:03
+507 tests, 373 passed, 2 failed, 79 errors, 53 skipped (73.57% success)
+
+2012-10-25T14:52:11
+507 tests, 399 passed, 1 failed, 54 errors, 53 skipped (78.70% success)
+
+2012-10-25T14:54:43
+507 tests, 401 passed, 1 failed, 52 errors, 53 skipped (79.09% success)
+
+2012-10-25T14:57:22
+507 tests, 410 passed, 1 failed, 43 errors, 53 skipped (80.87% success)
+
+2012-10-25T14:59:25
+507 tests, 416 passed, 1 failed, 37 errors, 53 skipped (82.05% success)
+
