@@ -1,7 +1,7 @@
 RDFLib-SPARQL
 =============
 
-A SPARQL 1.1 implementation for RDFLib
+A SPARQL 1.1 implementation for RDFLib.
 
 This replaces the old implementation available in RDFExtras, hopefully
 with more maintainable code.
@@ -17,7 +17,15 @@ strongly enough.
 installed still gave me the NEW sparql implementation - but I belive
 this was random, i.e. depending on a hash value of something)
 
-Then query like you always would - see also *./examples/query.py*
+```python
+#./examples/query.py
+
+g=rdflib.Graph()
+g.load("foaf.rdf")
+
+for row in g.query('select ?s where { [] <http://xmlns.com/foaf/0.1/knows> ?s .}'): 
+    print row
+```
 
 Prepared Queries
 ----------------
@@ -26,18 +34,43 @@ Queries can be parsed/translated beforehand - and the initBindings
 kwarg to graph.query can be used to fill in variables that are known:
 
 ```python
-import rdflib_sparql.processor
-query=rdflib_sparql.processor.prepareQuery( ...queryString... ) 
-...
-graph.query(query, initBindings={ 'person': rdflib.URIRef('http://dbpedia.org/resource/Tim_Berners-Lee') } )
-...
+# ./examples/preparedquery.py
+
+import rdflib
+from rdflib_sparql.processor import prepareQuery
+
+q=prepareQuery('select ?s where { ?person <http://xmlns.com/foaf/0.1/knows> ?s .}')
+
+g=rdflib.Graph()
+g.load("foaf.rdf")
+
+tim=rdflib.URIRef("http://www.w3.org/People/Berners-Lee/card#i")
+
+for row in g.query(q, initBindings={'person': tim}): 
+    print row
+
 ```
 
 Property Paths
 --------------
 
 SPARQL PropertyPaths are also available as "pseudo properties" in python code. 
-See *./examples/foafpath.py* and docs in *rdflib_sparql/paths.py*
+See docs in *rdflib_sparql/paths.py*
+
+```python
+# ./examples/foafpath.py
+
+g=Graph()
+g.load("foaf.rdf")
+
+tim=URIRef("http://www.w3.org/People/Berners-Lee/card#i")
+
+print "Timbl knows:"
+
+# find name of everyone tim knows:
+for o in g.objects(tim, FOAF.knows/FOAF.name):
+    print o
+```
 
 SPARQL Update
 -------------
@@ -45,7 +78,28 @@ SPARQL Update
 SPARQL Update is implemented - but no HTTP/SPARQL Protocol yet.
 SPARQL Update requests can be evaluated with `rdflib_sparql.processor.processUpdate`
 
-see also *./examples/update.py*
+```python
+# ./examples/update.py*
+
+import rdflib
+from rdflib_sparql.processor import processUpdate
+
+g=rdflib.Graph()
+g.load("foaf.rdf")
+
+processUpdate(g, '''
+PREFIX foaf: <http://xmlns.com/foaf/0.1/> 
+PREFIX dbpedia: <http://dbpedia.org/resource/> 
+INSERT 
+    { ?s a dbpedia:Human . } 
+WHERE 
+    { ?s a foaf:Person . }
+''')
+
+for x in g.subjects(rdflib.RDF.type, rdflib.URIRef('http://dbpedia.org/resource/Human')): 
+    print x
+
+```
 
 Status: 
 -------
