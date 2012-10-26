@@ -1,9 +1,8 @@
 import sys
 import re
-import traceback
 
 from pyparsing import Literal, Regex, Optional, OneOrMore, ZeroOrMore, \
-    Forward, ParseException, Suppress, Combine, restOfLine, Group, Empty, ParseResults, delimitedList
+    Forward, ParseException, Suppress, Combine, restOfLine, Group, ParseResults, delimitedList
 from pyparsing import CaselessKeyword as Keyword # watch out :) 
 #from pyparsing import Keyword as CaseSensitiveKeyword 
 
@@ -786,7 +785,7 @@ InsertClause = Comp('InsertClause', Keyword('INSERT') + QuadPattern)
 UsingClause = Comp('UsingClause', Keyword('USING') + ( Param('default', iri) | Keyword('NAMED') + Param('named', iri) ))
 
 # [41] Modify ::= ( 'WITH' iri )? ( DeleteClause Optional(InsertClause) | InsertClause ) ZeroOrMore(UsingClause) 'WHERE' GroupGraphPattern
-Modify = Comp('Modify', Optional( Keyword('WITH') + iri ) + ( Param('delete', DeleteClause) + Optional(Param('insert', InsertClause)) | Param('insert', InsertClause) ) + ZeroOrMore(ParamList('using', UsingClause)) + Keyword('WHERE') + Param('where', GroupGraphPattern))
+Modify = Comp('Modify', Optional( Keyword('WITH') + Param('withClause', iri) ) + ( Param('delete', DeleteClause) + Optional(Param('insert', InsertClause)) | Param('insert', InsertClause) ) + ZeroOrMore(ParamList('using', UsingClause)) + Keyword('WHERE') + Param('where', GroupGraphPattern))
 
 
 # [30] Update1 ::= Load | Clear | Drop | Add | Move | Copy | Create | InsertData | DeleteData | DeleteWhere | Modify

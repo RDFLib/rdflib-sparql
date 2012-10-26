@@ -4,9 +4,11 @@ Code for carrying out Update Operations
 
 """
 
+from rdflib import BNode, Graph
+
 from rdflib_sparql.sparql import QueryContext
 from rdflib_sparql.evalutils import _fillTemplate, _join
-from rdflib_sparql.evaluate import evalBGP
+from rdflib_sparql.evaluate import evalBGP, evalPart
 
 def _graphOrDefault(ctx, g):
     if g=='DEFAULT':
@@ -109,7 +111,65 @@ def evalDeleteWhere(ctx,u):
             
 
 def evalModify(ctx,u):
-    raise Exception("Modify not implemented!")
+
+    # Using replaces the dataset for evaluating the where-clause
+    if u.using:
+        otherDefault=False
+        for d in u.using:
+            if d.default:
+
+                if not otherDefault:
+                    # replace current default graph
+                    dg=Graph()
+                    ctx.pushGraph(dg)
+                    otherDefault=True
+                
+                ctx.load(d.default, default=True)
+
+            elif d.named:
+                g=d.named
+                ctx.load(g, default=False)
+                
+
+    # "The WITH clause provides a convenience for when an operation
+    # primarily refers to a single graph. If a graph name is specified
+    # in a WITH clause, then - for the purposes of evaluating the
+    # WHERE clause - this will define an RDF Dataset containing a
+    # default graph with the specified name, but only in the absence
+    # of USING or USING NAMED clauses. In the presence of one or more
+    # graphs referred to in USING clauses and/or USING NAMED clauses,
+    # the WITH clause will be ignored while evaluating the WHERE
+    # clause."
+                
+    if not u.using and u.withClause:
+        g=ctx.dataset.get_context(u.withClause)
+        ctx.pushGraph(g)
+
+    res=evalPart(ctx, u.where)
+
+    if u.using:
+        if otherDefault:
+            ctx.popGraph() # restore original default graph
+        if u.withClause:
+            g=ctx.dataset.get_context(u.withClause)
+            ctx.pushGraph(g)
+
+                
+    for c in res:
+        dg=ctx.graph
+        if u.delete:
+            dg-=_fillTemplate(u.delete.triples, c)
+
+            for g,q in u.delete.quads.iteritems():
+                cg=ctx.dataset.get_context(g)
+                cg-=_fillTemplate(q, c)
+
+        if u.insert:
+            dg+=_fillTemplate(u.insert.triples, c)
+
+            for g,q in u.insert.quads.iteritems():
+                cg=ctx.dataset.get_context(g)
+                cg+=_fillTemplate(q, c)
 
 
 def evalAdd(ctx,u):
@@ -123,6 +183,9 @@ def evalAdd(ctx,u):
 
     srcg=_graphOrDefault(ctx, src)
     dstg=_graphOrDefault(ctx, dst)
+
+    if srcg.identifier==dstg.identifier:
+        return 
 
     dstg+=srcg
 
@@ -138,9 +201,12 @@ def evalMove(ctx,u):
     """
 
     src,dst=u.graph
-
+    
     srcg=_graphOrDefault(ctx, src)
     dstg=_graphOrDefault(ctx, dst)
+
+    if srcg.identifier==dstg.identifier:
+        return 
 
     dstg.remove((None,None,None))
 
@@ -165,6 +231,7 @@ def evalCopy(ctx,u):
 
     if srcg.identifier==dstg.identifier:
         return 
+
     dstg.remove((None,None,None))
 
     dstg+=srcg

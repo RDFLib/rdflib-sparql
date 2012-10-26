@@ -1,14 +1,3 @@
-import collections
-
-from rdflib import Variable, Graph, BNode
-
-from rdflib_sparql.parserutils import value
-from rdflib_sparql.sparql import QueryContext, AlreadyBound, FrozenBindings, SPARQLError
-from rdflib_sparql.evalutils import _filter, _eval, _join, _diff, _minus, _fillTemplate
-
-from rdflib_sparql.aggregates import evalAgg
-
-
 """
 These method recursively evaluate the SPARQL Algebra 
 
@@ -23,6 +12,18 @@ information needed for evaluation
 A list of dicts (solution mappings) is returned, apart from GroupBy which may also return a dict of list of dicts
 
 """
+
+import collections
+
+from rdflib import Variable, Graph, BNode
+
+from rdflib_sparql.parserutils import value
+from rdflib_sparql.sparql import QueryContext, AlreadyBound, FrozenBindings, SPARQLError
+from rdflib_sparql.evalutils import _filter, _eval, _join, _diff, _minus, _fillTemplate
+
+from rdflib_sparql.aggregates import evalAgg
+
+
 
 def evalBGP(ctx, bgp): 
 
@@ -369,9 +370,9 @@ def evalQuery(graph, query, initBindings, initNs, base=None):
                     # replace current default graph
                     dg=ctx.dataset.get_context(BNode())
                     ctx.pushGraph(dg)
+                    firstDefault=True
                 
-                g=d.default
-                ctx.load(g, default=True)
+                ctx.load(d.default, default=True)
 
             elif d.named:
                 g=d.named

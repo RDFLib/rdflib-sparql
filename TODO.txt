@@ -1,5 +1,19 @@
+- Implement DESCRIBE!
+
 - Literal cmp/hash-values
 
 - Confusion around QueryContext vs. FrozenBindings when going up/down algebra tree
 
 - Confusion around CompValue / ListParam vs. pyparsing Group
+
+
+- Replace WHOLE dataset when FROM/FROM NAMED/USING is used
+
+- Optimisation
+
+  * reorder triples in BGP
+  * eager filtering
+
+- Hook for custom-functions
+
+- Hook for custom algebra evaluation? SQL? 

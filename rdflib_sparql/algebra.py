@@ -528,7 +528,6 @@ def translateQuads(quads):
     else: 
         alltriples=[]
 
-
     allquads=collections.defaultdict(list)
     
     if quads.quadsNotTriples:
@@ -551,9 +550,9 @@ def translateUpdate1(u, prologue):
             pass  # TODO: check for bnodes in triples
     elif u.name == 'Modify': 
         if u.delete: 
-            u.delete["quads"]=translateQuads(u.delete.quads)
+            u.delete["triples"],u.delete["quads"]=translateQuads(u.delete.quads)
         if u.insert: 
-            u.insert["quads"]=translateQuads(u.insert.quads)
+            u.insert["triples"],u.insert["quads"]=translateQuads(u.insert.quads)
         u["where"]=translateGroupGraphPattern(u.where)
     else: 
         raise Exception('Unknown type of update operation: %s'%u)
@@ -563,12 +562,16 @@ def translateUpdate1(u, prologue):
 def translateUpdate(q, base=None): 
     res=[]
     prologue=None
-    for p,u in zip(q.prologue, q.request or [None]): 
+    if not q.request: return res
+    for p,u in zip(q.prologue, q.request): 
         prologue=translatePrologue(p, base, prologue)
 
-        if u is None: continue
         # absolutize/resolve prefixes
         u=traverse(u, visitPost=functools.partial(translatePName, prologue=prologue))
+        u=_traverse(u, _simplifyFilters)
+
+        u=traverse(u, visitPost=translatePath)
+
 
         res.append(translateUpdate1(u,prologue))
     

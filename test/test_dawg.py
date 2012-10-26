@@ -14,6 +14,7 @@ from rdflib import ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef, BNode,
 from rdflib.query import Result
 from rdflib.compare import isomorphic
 
+import rdflib_sparql as rdflib_sparql_module
 from rdflib_sparql.algebra import pprintAlgebra, translateQuery, translateUpdate
 from rdflib_sparql.parser import parseQuery, parseUpdate
 from rdflib_sparql.results.rdfresults import RDFResultParser
@@ -23,6 +24,9 @@ from nose.tools import nottest, eq_ as eq
 from nose import SkipTest
 
 from urlparse import urljoin
+
+# do not resolve URIs looking for more data
+
 
 DEBUG_FAIL=True
 DEBUG_FAIL=False
@@ -147,6 +151,9 @@ def pp_binding(solutions):
 @nottest 
 def update_test(t): 
 
+    # the update-eval tests refer to graphs on http://example.org
+    rdflib_sparql_module.SPARQL_LOAD_GRAPHS=False
+
     uri, name,comment,data,graphdata,query,res,syntax=t
 
     try: 
@@ -189,7 +196,8 @@ def update_test(t):
         
         eq(set(x.identifier for x in g.contexts() if x!=g.default_context),
            set(x.identifier for x in resg.contexts() if x!=resg.default_context))
-        assert isomorphic(g.default_context,resg.default_context)
+        assert isomorphic(g.default_context,resg.default_context), 'Default graphs are not isomorphic'
+
         for x in g.contexts(): 
             if x==g.default_context: continue
             assert isomorphic(x, resg.get_context(x.identifier)), "Graphs with ID %s are not isomorphic"%x.identifier
@@ -244,15 +252,10 @@ def update_test(t):
             print "------------- MY RESULT ----------"
             print g.serialize(format='trig')
 
-            # if resfile:
-            #     print "----------------- Res -------------------"            
-            #     print ">>>", resfile
-            #     print file(resfile[7:]).read()
-
             try: 
                 pq=translateUpdate(parseUpdate(file(query[7:]).read()))
                 print "----------------- Parsed ------------------"
-                #pprintAlgebra(translateQuery(pq, base=urljoin(query,'.')))
+                #pprintAlgebra(pq)
                 print pq
             except: 
                 print "(parser error)"
@@ -268,6 +271,9 @@ def update_test(t):
 @nottest # gets called by generator
 def query_test(t):
     uri, name,comment,data,graphdata,query,resfile,syntax=t
+
+    # the query-eval tests refer to graphs to load by resolvable filenames
+    rdflib_sparql_module.SPARQL_LOAD_GRAPHS=True
 
     if uri in skiptests:
         raise SkipTest()

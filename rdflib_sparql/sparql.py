@@ -183,7 +183,7 @@ class QueryContext(object):
         self.bnodes=collections.defaultdict(BNode)
 
     def clone(self): 
-        r=QueryContext(self._dataset or self._graph)
+        r=QueryContext(self._dataset if self._dataset is not None else self._graph)
         r.prologue=self.prologue
         r.bindings.update(self.bindings)
         r._graph=list(self._graph)
@@ -218,7 +218,13 @@ class QueryContext(object):
             except:
                 raise Exception("Could not load %s as either RDF/XML, N3 or NTriples"%source)
 
-        if not rdflib_sparql.SPARQL_LOAD_GRAPHS: return
+        if not rdflib_sparql.SPARQL_LOAD_GRAPHS: 
+            # we are not loading - if we already know the graph
+            # being "loaded", just add it to the default-graph
+            if default:
+                self._graph[-1]+=self.dataset.get_context(source)
+            return
+
         if default: 
             _load(self.graph, source)
         else: 
