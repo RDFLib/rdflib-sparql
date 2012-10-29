@@ -32,7 +32,7 @@ class CSVResultParser(ResultParser):
         return r
         
     def parseRow(self, row, v): 
-        return dict(zip(v, [ self.convertTerm(t) for t in row ]))
+        return dict((var,val) for var,val in zip(v, [ self.convertTerm(t) for t in row ]) if val!=None)
     
     def convertTerm(self, t): 
         if t=="": return None

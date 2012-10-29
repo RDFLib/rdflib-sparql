@@ -1,17 +1,23 @@
 
+"""
+Converting the 'parse-tree' output of pyparsing to a SPARQL Algebra expression
+
+http://www.w3.org/TR/sparql11-query/#sparqlQuery
+
+"""
+
 import functools
 import collections
 
-from rdflib import Literal, Variable, URIRef
+from rdflib import Literal, Variable, URIRef, BNode
 
 from rdflib_sparql.sparql import Prologue, Query
 from rdflib_sparql.parserutils import CompValue, Expr
-from rdflib_sparql.operators import and_, simplify as simplifyFilters
+from rdflib_sparql.operators import and_, TrueFilter, simplify as simplifyFilters
 from rdflib_sparql.paths import InvPath, AlternativePath, SequencePath, ModPath, NegatedPath
 
 from pyparsing import ParseResults
 
-TrueFilter=Expr('TrueFilter', lambda _1, _2: Literal(True))
 
 
 # ---------------------------
@@ -54,13 +60,14 @@ def Group(p, expr=None):
     return CompValue('Group', p=p, expr=expr)
 
 
-
+def _knownterms(triple): 
+    return len(filter(None, (isinstance(x, (Variable, BNode)) for x in triple)))
 def triples(l): 
     l=reduce(lambda x,y: x+y, l)
     if (len(l) % 3) != 0: 
         #import pdb ; pdb.set_trace()
         raise Exception('these aint triples')
-    return [(l[x],l[x+1],l[x+2]) for x in range(0,len(l),3)]
+    return sorted([(l[x],l[x+1],l[x+2]) for x in range(0,len(l),3)], key=_knownterms)
 
 def translatePName(p,prologue):
     """
@@ -560,6 +567,10 @@ def translateUpdate1(u, prologue):
     return u
 
 def translateUpdate(q, base=None): 
+    """
+    Returns a list of SPARQL Update Algebra expressions
+    """
+
     res=[]
     prologue=None
     if not q.request: return res
@@ -579,10 +590,13 @@ def translateUpdate(q, base=None):
 
 
 def translateQuery(q, base=None): 
+    """    
+    Translate a query-parsetree to a SPARQL Algebra Expression
+
+    Return a rdflib_sparql.sparql.Query object    
     """
-    We get in: 
-    (prologue, query)
-    """
+
+    # We get in: (prologue, query)
     
     prologue=translatePrologue(q[0], base)
 
@@ -629,11 +643,11 @@ if __name__=='__main__':
     import os.path
 
     if os.path.exists(sys.argv[1]): 
-        q=file(sys.argv[1]).read()
+        q=file(sys.argv[1])
     else: 
         q=sys.argv[1]
 
-    pq=rdflib_sparql.parser.QueryUnit.parseString(q)
+    pq=rdflib_sparql.parser.parseQuery(q)
     print pq
     tq=translateQuery(pq)
     print pprintAlgebra(tq)

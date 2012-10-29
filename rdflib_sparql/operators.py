@@ -1,3 +1,11 @@
+""" 
+This contains evaluation functions for expressions 
+
+They get bound as instances-methods to the CompValue objects from parserutils
+using setEvalFn
+
+"""
+
 import re
 import math
 import random
@@ -17,16 +25,9 @@ from rdflib.term import Node
 
 from pyparsing import ParseResults
 
-from rdflib_sparql.sparql import SPARQLError, NotBoundError, SPARQLTypeError, QueryContext
+from rdflib_sparql.sparql import SPARQLError, SPARQLTypeError
 
 
-""" 
-This contains evaluation functions for expressions 
-
-They get bound as instances-methods to the CompValue objects from parserutils
-using setEvalFn
-
-"""
 
 # closed namespace, langString isn't in it
 RDF_langString=URIRef(RDF.uri+"langString")
@@ -777,6 +778,8 @@ def and_(*args):
     return Expr('ConditionalAndExpression', ConditionalAndExpression, 
                 expr=args[0], other=list(args[1:]))
     
+TrueFilter=Expr('TrueFilter', lambda _1, _2: Literal(True))
+
 
 def simplify(expr): 
     if isinstance(expr, ParseResults) and len(expr)==1: 

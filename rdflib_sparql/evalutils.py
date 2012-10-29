@@ -2,12 +2,13 @@ import collections
 
 from rdflib import Variable, Literal, BNode
 
-from rdflib_sparql.operators import EBV
+from rdflib_sparql.operators import EBV, TrueFilter
 from rdflib_sparql.parserutils import Expr, CompValue
 from rdflib_sparql.sparql import SPARQLError, NotBoundError
 
 def _diff(a,b, expr): 
-    res=set()
+    res=set()    
+
     for x in a: 
         if all(not x.compatible(y) or not _ebv(expr,x.merge(y)) for y in b): 
             res.add(x)
@@ -76,7 +77,6 @@ def _eval(expr, ctx):
 
 
 def _filter(a,expr): 
-#    import pdb; pdb.set_trace()
     for c in a:
         if _ebv(expr, c):
             yield c

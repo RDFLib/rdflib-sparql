@@ -96,7 +96,7 @@ class FrozenBindings(collections.Mapping):
         return len(self._d)
 
     def __getitem__(self, key):
-        if not isinstance(key, (BNode, Variable)):
+        if not type(key) in (BNode, Variable):
             return key
 
         return self._d[key]
@@ -122,11 +122,10 @@ class FrozenBindings(collections.Mapping):
     
     def compatible(self, other): 
         for k in self: 
-            if k in other:
+            try: 
                 if self[k]!=other[k]: return False
-        for k in other:
-            if k in self: 
-                if self[k]!=other[k]: return False
+            except KeyError:
+                pass
 
         return True
     
@@ -232,7 +231,7 @@ class QueryContext(object):
 
     def __getitem__(self, key):
         # in SPARQL BNodes are just labels
-        if not isinstance(key, (BNode, Variable)):
+        if not type(key) in (BNode, Variable):
             return key
         try: 
             return self.bindings[key]
