@@ -38,3 +38,22 @@ data-sparql11/entailment/plainLit.ttl / lang.ttl / simple.ttl
 I fixed with: 
 
 perl -pi -e 's/\r/\n/g' <file>
+
+Custom SPARQL Algebra Evaluation 
+--------------------------------
+
+SPARQL Algebra evaluation can be overridden by a setuptools entry_point
+
+The entry_point group is ''rdf.plugins.sparqleval'' 
+
+A function must be provided which takes paramters ``ctx and part``. 
+
+The function may raise ```NotImplementedError``` if it does not wish
+to handle a certain part.
+
+See ''rdflib_sparql/evaluate.py'' for details (in particular evalPart)
+
+Most interesting is probably overriding evalBGP.
+
+See '''examples/customEval.py'''
+

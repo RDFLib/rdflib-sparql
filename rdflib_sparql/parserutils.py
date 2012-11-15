@@ -16,6 +16,11 @@ if DEBUG:
     import traceback
 
 """
+
+NOTE: PyParsing setResultName/__call__ provides a very similar solution to this
+I didn't realise at the time of writing and I will remove a 
+lot of this code at some point
+
 Utility classes for creating an abstract-syntax tree out with pyparsing actions
 
 Lets you label and group parts of parser production rules

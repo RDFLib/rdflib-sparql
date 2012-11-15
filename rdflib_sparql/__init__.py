@@ -10,7 +10,26 @@ named graphs (like RDFLib's ConjunctiveGraph)
 """
 SPARQL_DEFAULT_GRAPH_UNION=True
 
+"""
+Custom evaluation functions 
+
+These must be functions taking ctx, part 
+and returning False if they cannot handle a certain part
+"""
+
+PLUGIN_ENTRY_POINT='rdf.plugins.sparqleval'
+
+CUSTOM_EVALS={}
+
 import parser
 import operators
 import parserutils
 
+
+try:
+    from pkg_resources import iter_entry_points
+except ImportError:
+    pass  # TODO: log a message
+else:
+    for ep in iter_entry_points(PLUGIN_ENTRY_POINT):
+        CUSTOM_EVALS[ep.name]=ep.load()

@@ -286,7 +286,10 @@ class Prologue:
         self.namespace_manager=NamespaceManager(Graph())  # ns man needs a store
 
     def resolvePName(self, prefix, localname): 
-        return URIRef(self.namespace_manager.store.namespace(prefix or "")+(localname or ""))
+        ns=self.namespace_manager.store.namespace(prefix or "")
+        if ns==None:
+            raise Exception('Unknown namespace prefix : %s'%prefix)
+        return URIRef(ns+(localname or ""))
 
     def bind(self, prefix, uri): 
         self.namespace_manager.bind(prefix, uri)

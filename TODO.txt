@@ -1,3 +1,7 @@
+- initNS doesn't work!
+
+- Fix crappy pyparsing utilities - use setResultName
+
 - Implement DESCRIBE!
 
 - Literal cmp/hash-values

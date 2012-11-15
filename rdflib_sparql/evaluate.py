@@ -17,6 +17,7 @@ import collections
 
 from rdflib import Variable, Graph, BNode
 
+from rdflib_sparql import CUSTOM_EVALS
 from rdflib_sparql.parserutils import value
 from rdflib_sparql.sparql import QueryContext, AlreadyBound, FrozenBindings, SPARQLError
 from rdflib_sparql.evalutils import _filter, _eval, _join, _diff, _minus, _fillTemplate
@@ -161,8 +162,16 @@ def evalMultiset(ctx, part):
     return evalPart(ctx, part.p)
 
 def evalPart(ctx, part):
+
+    # try custom evaluation functions
+    for name,c in CUSTOM_EVALS.items():
+        try:
+            return c(ctx,part)
+        except NotImplementedError:
+            pass # the given custome-function did not handle this part
+
     if part.name=='BGP':
-        return evalBGP(ctx,part.triples)
+        return evalBGP(ctx,part.triples) # NOTE we pass part.triples, not part!
     elif part.name=='Filter': 
         return evalFilter(ctx,part)
     elif part.name=='Join': 
