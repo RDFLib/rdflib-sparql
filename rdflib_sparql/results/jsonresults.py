@@ -106,12 +106,12 @@ def parseJsonTerm(d):
 
 def termToJSON(self,term): 
     if isinstance(term, URIRef): 
-        return { 'type': 'uri', 'value': str(term) }
+        return { 'type': 'uri', 'value': unicode(term) }
     elif isinstance(term, Literal):
         if term.datatype!=None:
             return { 'type': 'typed-literal', 
                      'value': unicode(term), 
-                     'datatype': str(term.datatype) }
+                     'datatype': unicode(term.datatype) }
         else:
             r={'type': 'literal',
                'value': unicode(term) }
