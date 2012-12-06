@@ -1,3 +1,7 @@
+
+__version__ = "0.1"
+
+
 """
 If true, using FROM <uri> and FROM NAMED <uri> 
 will load/parse more data

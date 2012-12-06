@@ -1,5 +1,16 @@
-import sys
+import sys, re
 from setuptools import setup, find_packages
+
+# Find version. We have to do this because we can't import it in Python 3 until
+# its been automatically converted in the setup process.
+def find_version(filename):
+    _version_re = re.compile(r'__version__ = "(.*)"')
+    for line in open(filename):
+        version_match = _version_re.match(line)
+        if version_match:
+            return version_match.group(1)
+
+version = find_version('rdflib_sparql/__init__.py')
 
 def setup_python3():
     # Taken from "distribute" setup.py
@@ -43,7 +54,10 @@ if sys.version_info[0] >= 3:
 
 setup(
     name = "rdflib-sparql",
-    version = "0.1-dev",
+    author = "Gunnar Aastrand Grimnes", 
+    author_email = "gromgull@gmail.com",
+    url="http://github.com/RDFLib/rdflib-sparql",
+    version = version,
     packages = find_packages(),
     install_requires = requires,
     tests_require = [ 'nose' ],
