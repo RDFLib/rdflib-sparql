@@ -513,13 +513,16 @@ def simplify(n):
         if n.p2.name=='BGP' and len(n.p2.triples)==0:
             return n.p1
 
-def translatePrologue(p, base, prologue=None): 
+def translatePrologue(p, base, initNs=None, prologue=None): 
 
     if prologue is None:
         prologue=Prologue()
         prologue.base=""
     if base:
         prologue.base=base
+    if initNs: 
+        for k,v in initNs.iteritems():
+            prologue.bind(k,v)
 
     for x in p:
         if x.name=='Base': 
@@ -566,7 +569,7 @@ def translateUpdate1(u, prologue):
 
     return u
 
-def translateUpdate(q, base=None): 
+def translateUpdate(q, base=None, initNs=None): 
     """
     Returns a list of SPARQL Update Algebra expressions
     """
@@ -575,7 +578,7 @@ def translateUpdate(q, base=None):
     prologue=None
     if not q.request: return res
     for p,u in zip(q.prologue, q.request): 
-        prologue=translatePrologue(p, base, prologue)
+        prologue=translatePrologue(p, base, initNs, prologue)
 
         # absolutize/resolve prefixes
         u=traverse(u, visitPost=functools.partial(translatePName, prologue=prologue))
@@ -589,7 +592,7 @@ def translateUpdate(q, base=None):
     return res
 
 
-def translateQuery(q, base=None): 
+def translateQuery(q, base=None, initNs=None): 
     """    
     Translate a query-parsetree to a SPARQL Algebra Expression
 
@@ -598,7 +601,7 @@ def translateQuery(q, base=None):
 
     # We get in: (prologue, query)
     
-    prologue=translatePrologue(q[0], base)
+    prologue=translatePrologue(q[0], base, initNs)
 
     # absolutize/resolve prefixes
     q[1]=traverse(q[1], visitPost=functools.partial(translatePName, prologue=prologue))

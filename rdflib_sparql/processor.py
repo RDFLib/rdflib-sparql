@@ -54,9 +54,9 @@ class SPARQLProcessor(Processor):
         
         if not isinstance(strOrQuery, Query):
             parsetree=parseQuery(strOrQuery)
-            query=translateQuery(parsetree,base)
+            query=translateQuery(parsetree,base,initNs)
         else: 
             query=strOrQuery
         
-        return evalQuery(self.graph, query, initBindings, initNs, base)
+        return evalQuery(self.graph, query, initBindings, base)
         

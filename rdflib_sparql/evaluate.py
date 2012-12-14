@@ -346,7 +346,7 @@ def evalConstructQuery(ctx, query):
     return res
 
 
-def evalQuery(graph, query, initBindings, initNs, base=None):
+def evalQuery(graph, query, initBindings, base=None):
     ctx=QueryContext(graph)
 
     ctx.prologue=query.prologue
@@ -357,10 +357,6 @@ def evalQuery(graph, query, initBindings, initNs, base=None):
                 k=Variable(k)
             ctx[k]=v
         ctx.push() # nescessary?
-
-    if initNs: # Hmm... are these ever used at this point?
-        for k,v in initNs:
-            ctx.prologue.namespace_manager.bind(k,v)
 
     main=query.algebra
 
