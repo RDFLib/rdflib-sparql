@@ -185,7 +185,7 @@ class Expr(CompValue):
 
         self._evalfn=None
         if evalfn:
-            self._evalfn=MethodType(evalfn, self, CompValue)
+            self._evalfn=MethodType(evalfn, self)
 
     def eval(self, ctx={}): 
         try: 
@@ -215,7 +215,7 @@ class Comp(TokenConverter):
 
         if self.evalfn:
             res=Expr(self.name)
-            res._evalfn=MethodType(self.evalfn, res, CompValue)
+            res._evalfn=MethodType(self.evalfn, res)
         else:
             res=CompValue(self.name)
 

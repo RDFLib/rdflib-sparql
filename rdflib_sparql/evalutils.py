@@ -1,6 +1,6 @@
 import collections
 
-from rdflib import Variable, Literal, BNode
+from rdflib.term import Variable, Literal, BNode, URIRef
 
 from rdflib_sparql.operators import EBV, TrueFilter
 from rdflib_sparql.parserutils import Expr, CompValue
@@ -61,7 +61,7 @@ def _ebv(expr, ctx):
     return False
 
 def _eval(expr, ctx):
-    if isinstance(expr, Literal): 
+    if isinstance(expr, (Literal, URIRef)): 
         return expr
     if isinstance(expr, Expr):         
         return expr.eval(ctx)
