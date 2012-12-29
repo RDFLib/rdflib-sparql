@@ -463,15 +463,18 @@ def translate(q):
     if q.valuesClause:
         M=Join(p1=M, p2=ToMultiSet(translateValues(q.valuesClause)))
 
-    PV=set()
     if not q.var and not q.expr: 
         # select * 
-        PV=VS
+        PV=list(VS)
     else: 
+        PV=list()    
         if q.var:
-            PV.update(q.var)
+            for v in q.var: 
+                if v not in PV: PV.append(v)
         if q.evar:
-            PV.update(q.evar)
+            for v in q.evar: 
+                if v not in PV: PV.append(v)
+
             E+=zip(q.expr, q.evar)
 
     for e,v in E: 
