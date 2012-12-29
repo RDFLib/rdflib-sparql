@@ -40,17 +40,19 @@ def setup_python3():
     return tmp_src
 
 
-requires = [ 'pyparsing', 'rdflib>3.2' ]
+requires = [ 'rdflib>3.2' ]
 
 kwargs={}
 
 if sys.version_info[:2]<(2,7): 
-    requires.append("ordereddict")
+    requires.append("ordereddict")    
 
 if sys.version_info[0] >= 3:
     kwargs['use_2to3'] = True
     kwargs['src_root'] = setup_python3()
-
+    requires.append("pyparsing")
+else: 
+    requires.append("pyparsing<=1.5.7")
 
 setup(
     name = "rdflib-sparql",
