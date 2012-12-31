@@ -1,7 +1,8 @@
 include README.md
 include DEVELOPERS.md
 include setup.py
+include skiptests.list
 recursive-include rdflib_sparql *.py
-recursive-include examples *.py
+recursive-include examples *.py *.rdf
 graft test
 
