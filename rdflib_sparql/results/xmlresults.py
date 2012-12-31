@@ -14,7 +14,7 @@ from rdflib.query import (
     ResultParser,
     ResultSerializer,
     ResultException
-    )
+)
 
 SPARQL_XML_NAMESPACE = u'http://www.w3.org/2005/sparql-results#'
 RESULTS_NS_ET = '{%s}' % SPARQL_XML_NAMESPACE
@@ -40,13 +40,13 @@ class XMLResultParser(ResultParser):
 class XMLResult(Result):
     def __init__(self, source):
 
-        xmlstring=source.read()
+        xmlstring = source.read()
 
         if isinstance(xmlstring, unicode):
             xmlstring = xmlstring.encode('utf-8')
         try:
-            tree=ElementTree.fromstring(xmlstring)
-        except Exception, e: 
+            tree = ElementTree.fromstring(xmlstring)
+        except Exception, e:
             try:
                 raise e.__class__("error parsing %r: %s" % (xmlstring, e))
             except:
@@ -55,20 +55,21 @@ class XMLResult(Result):
         boolean = tree.find(RESULTS_NS_ET + 'boolean')
         results = tree.find(RESULTS_NS_ET + 'results')
 
-        if boolean != None:
+        if boolean is not None:
             type_ = 'ASK'
-        elif results != None:
+        elif results is not None:
             type_ = 'SELECT'
-        else: 
-            g=Graph()
-            try: 
+        else:
+            g = Graph()
+            try:
                 g.parse(data=xmlstring)
-                if len(g)==0: 
-                    raise 
-                type_='CONSTRUCT'
-                    
-            except: 
-                raise ResultException("No RDF Graph, result-bindings or boolean answer found!")
+                if len(g) == 0:
+                    raise
+                type_ = 'CONSTRUCT'
+
+            except:
+                raise ResultException(
+                    "No RDF Graph, result-bindings or boolean answer found!")
 
         Result.__init__(self, type_)
         if type_ == 'SELECT':
@@ -80,13 +81,14 @@ class XMLResult(Result):
                 self.bindings.append(r)
 
             self.vars = [Variable(x.get("name"))
-                for x in tree.findall(
-                    './%shead/%svariable' % (RESULTS_NS_ET, RESULTS_NS_ET))]
+                         for x in tree.findall(
+                         './%shead/%svariable' % (
+                            RESULTS_NS_ET, RESULTS_NS_ET))]
 
         elif type_ == 'ASK':
             self.askAnswer = boolean.text.lower().strip() == "true"
         elif type_ == 'CONSTRUCT':
-            self.graph=g
+            self.graph = g
 
 
 def parseTerm(element):
@@ -96,13 +98,13 @@ def parseTerm(element):
     if tag == RESULTS_NS_ET + 'literal':
         if text is None:
             text = ''
-        datatype=None
-        lang=None
+        datatype = None
+        lang = None
         if element.get('datatype', None):
             datatype = URIRef(element.get('datatype'))
-        elif element.get("{%s}lang"%XML_NAMESPACE, None):
-            lang = element.get("{%s}lang"%XML_NAMESPACE)
-        
+        elif element.get("{%s}lang" % XML_NAMESPACE, None):
+            lang = element.get("{%s}lang" % XML_NAMESPACE)
+
         ret = Literal(text, datatype=datatype, lang=lang)
 
         return ret
@@ -112,7 +114,6 @@ def parseTerm(element):
         return BNode(text)
     else:
         raise TypeError("unknown binding type %r" % element)
-
 
 
 class XMLResultSerializer(ResultSerializer):
@@ -151,7 +152,7 @@ class SPARQLXMLWriter:
         writer.startPrefixMapping(u'xml', XML_NAMESPACE)
         writer.startElementNS(
             (SPARQL_XML_NAMESPACE, u'sparql'),
-             u'sparql', AttributesNSImpl({}, {}))
+            u'sparql', AttributesNSImpl({}, {}))
         self.writer = writer
         self._output = output
         self._encoding = encoding
@@ -160,25 +161,25 @@ class SPARQLXMLWriter:
     def write_header(self, allvarsL):
         self.writer.startElementNS(
             (SPARQL_XML_NAMESPACE, u'head'),
-             u'head', AttributesNSImpl({}, {}))
+            u'head', AttributesNSImpl({}, {}))
         for i in xrange(0, len(allvarsL)):
             attr_vals = {
                 (None, u'name'): unicode(allvarsL[i]),
-                }
+            }
             attr_qnames = {
                 (None, u'name'): u'name',
-                }
+            }
             self.writer.startElementNS(
                 (SPARQL_XML_NAMESPACE, u'variable'),
-                 u'variable', AttributesNSImpl(attr_vals, attr_qnames))
+                u'variable', AttributesNSImpl(attr_vals, attr_qnames))
             self.writer.endElementNS((SPARQL_XML_NAMESPACE,
-                                    u'variable'), u'variable')
+                                      u'variable'), u'variable')
         self.writer.endElementNS((SPARQL_XML_NAMESPACE, u'head'), u'head')
 
     def write_ask(self, val):
         self.writer.startElementNS(
             (SPARQL_XML_NAMESPACE, u'boolean'),
-             u'boolean', AttributesNSImpl({}, {}))
+            u'boolean', AttributesNSImpl({}, {}))
         self.writer.characters(str(val).lower())
         self.writer.endElementNS(
             (SPARQL_XML_NAMESPACE, u'boolean'), u'boolean')
@@ -186,13 +187,13 @@ class SPARQLXMLWriter:
     def write_results_header(self):
         self.writer.startElementNS(
             (SPARQL_XML_NAMESPACE, u'results'),
-             u'results', AttributesNSImpl({}, {}))
+            u'results', AttributesNSImpl({}, {}))
         self._results = True
 
     def write_start_result(self):
         self.writer.startElementNS(
             (SPARQL_XML_NAMESPACE, u'result'),
-             u'result', AttributesNSImpl({}, {}))
+            u'result', AttributesNSImpl({}, {}))
         self._resultStarted = True
 
     def write_end_result(self):
@@ -206,13 +207,13 @@ class SPARQLXMLWriter:
 
         attr_vals = {
             (None, u'name'): unicode(name),
-            }
+        }
         attr_qnames = {
             (None, u'name'): u'name',
-            }
+        }
         self.writer.startElementNS(
             (SPARQL_XML_NAMESPACE, u'binding'),
-             u'binding', AttributesNSImpl(attr_vals, attr_qnames))
+            u'binding', AttributesNSImpl(attr_vals, attr_qnames))
 
         if isinstance(val, URIRef):
             self.writer.startElementNS(
@@ -224,7 +225,7 @@ class SPARQLXMLWriter:
         elif isinstance(val, BNode):
             self.writer.startElementNS(
                 (SPARQL_XML_NAMESPACE, u'bnode'),
-                 u'bnode', AttributesNSImpl({}, {}))
+                u'bnode', AttributesNSImpl({}, {}))
             self.writer.characters(val)
             self.writer.endElementNS(
                 (SPARQL_XML_NAMESPACE, u'bnode'), u'bnode')
@@ -240,10 +241,10 @@ class SPARQLXMLWriter:
 
             self.writer.startElementNS(
                 (SPARQL_XML_NAMESPACE, u'literal'),
-                 u'literal', AttributesNSImpl(attr_vals, attr_qnames))
+                u'literal', AttributesNSImpl(attr_vals, attr_qnames))
             self.writer.characters(val)
             self.writer.endElementNS(
-                    (SPARQL_XML_NAMESPACE, u'literal'), u'literal')
+                (SPARQL_XML_NAMESPACE, u'literal'), u'literal')
 
         else:
             raise Exception("Unsupported RDF term: %s" % val)

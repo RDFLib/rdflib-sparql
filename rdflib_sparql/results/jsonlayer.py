@@ -65,7 +65,7 @@ _encode = None
 
 def decode(string):
     """Decode the given JSON string.
-   
+
     :param string: the JSON string to decode
     :type string: basestring
     :return: the corresponding Python data structure
@@ -78,7 +78,7 @@ def decode(string):
 
 def encode(obj):
     """Encode the given object as a JSON string.
-   
+
     :param obj: the Python data structure to encode
     :type obj: object
     :return: the corresponding JSON string
@@ -92,17 +92,18 @@ def encode(obj):
 def use(module=None, decode=None, encode=None):
     """Set the JSON library that should be used, either by specifying a known
     module name, or by providing a decode and encode function.
-   
+
     The modules "simplejson", "cjson", and "json" are currently supported for
     the ``module`` parameter.
-   
+
     If provided, the ``decode`` parameter must be a callable that accepts a
     JSON string and returns a corresponding Python data structure. The
     ``encode`` callable must accept a Python data structure and return the
     corresponding JSON string. Exceptions raised by decoding and encoding
     should be propagated up unaltered.
-   
-    :param module: the name of the JSON library module to use, or the module object itself
+
+    :param module: the name of the JSON library module to use, or the module
+                   object itself
     :type module: str or module
     :param decode: a function for decoding JSON strings
     :type decode: callable
@@ -160,5 +161,3 @@ def _initialize():
         except ImportError:
             _init_stdlib()
     _initialized = True
-
-
