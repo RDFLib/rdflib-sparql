@@ -1,7 +1,6 @@
-
-
 import rdflib_sparql.parser
 import pprint
+
 
 def t(q):
     print q

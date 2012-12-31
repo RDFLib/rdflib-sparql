@@ -9,116 +9,122 @@ from decimal import Decimal
 Aggregation functions
 """
 
-        
 
-def _eval_rows(expr, group): 
-    for row in group: 
-        try: 
+def _eval_rows(expr, group):
+    for row in group:
+        try:
             yield _eval(expr, row)
-        except: 
+        except:
             pass
 
-def agg_Sum(a,group,bindings):
-    c=0
-    
-    for x in group: 
-        try: 
-            c+=numeric(_eval(a.vars, x))
-        except: 
-            pass # simply dont count
 
-    bindings[a.res]=Literal(c)
+def agg_Sum(a, group, bindings):
+    c = 0
 
-def agg_Min(a,group,bindings):
-    m=None
-    
-    for x in group: 
-        try: 
-            v=numeric(_eval(a.vars, x))
-            if m is None: 
-                m=v
-            else: 
-                m=min(v,m)
-        except: 
-            pass # simply dont count
+    for x in group:
+        try:
+            c += numeric(_eval(a.vars, x))
+        except:
+            pass  # simply dont count
 
-    if m is not None:
-        bindings[a.res]=Literal(m)
+    bindings[a.res] = Literal(c)
 
-def agg_Max(a,group,bindings):
-    m=None
-    
-    for x in group: 
-        try: 
-            v=numeric(_eval(a.vars, x))
-            if m is None: 
-                m=v
-            else: 
-                m=max(v,m)
-        except: 
-            pass # simply dont count
+
+def agg_Min(a, group, bindings):
+    m = None
+
+    for x in group:
+        try:
+            v = numeric(_eval(a.vars, x))
+            if m is None:
+                m = v
+            else:
+                m = min(v, m)
+        except:
+            pass  # simply dont count
 
     if m is not None:
-        bindings[a.res]=Literal(m)
+        bindings[a.res] = Literal(m)
 
 
-def agg_Count(a,group,bindings):
+def agg_Max(a, group, bindings):
+    m = None
 
-    c=0
-    for x in group: 
-        try: 
-            if a.vars!='*': _eval(a.vars, x)
-            c+=1
-        except: 
-            pass # simply dont count
+    for x in group:
+        try:
+            v = numeric(_eval(a.vars, x))
+            if m is None:
+                m = v
+            else:
+                m = max(v, m)
+        except:
+            pass  # simply dont count
 
-    bindings[a.res]=Literal(c)
+    if m is not None:
+        bindings[a.res] = Literal(m)
 
 
-def agg_Sample(a, group, bindings): 
-    try: 
-        bindings[a.res]=_eval(a.vars, iter(group).next())
+def agg_Count(a, group, bindings):
+
+    c = 0
+    for x in group:
+        try:
+            if a.vars != '*':
+                _eval(a.vars, x)
+            c += 1
+        except:
+            pass  # simply dont count
+
+    bindings[a.res] = Literal(c)
+
+
+def agg_Sample(a, group, bindings):
+    try:
+        bindings[a.res] = _eval(a.vars, iter(group).next())
     except StopIteration:
-        pass # no res
+        pass  # no res
 
-def agg_GroupConcat(a, group, bindings): 
 
-    sep=a.separator or " "
+def agg_GroupConcat(a, group, bindings):
 
-    bindings[a.res]=Literal(sep.join(unicode(x) for x in _eval_rows(a.vars, group)))
+    sep = a.separator or " "
 
-def agg_Avg(a, group, bindings): 
+    bindings[a.res] = Literal(
+        sep.join(unicode(x) for x in _eval_rows(a.vars, group)))
 
-    c=0
-    s=0
-    for x in group: 
-        try: 
-            s+=numeric(_eval(a.vars, x))
-            c+=1
-        except: 
-            pass # simply dont count
 
-    if c==0: 
-        bindings[a.res]=Literal(0)
-    else: 
-        bindings[a.res]=Literal(Decimal(s)/Decimal(c))
-    
+def agg_Avg(a, group, bindings):
 
-def evalAgg(a,group,bindings): 
-    if a.name=='Aggregate_Count':
-        return agg_Count(a,group,bindings)
-    elif a.name=='Aggregate_Sum':
-        return agg_Sum(a,group,bindings)
-    elif a.name=='Aggregate_Sample':
-        return agg_Sample(a,group,bindings)
-    elif a.name=='Aggregate_GroupConcat': 
-        return agg_GroupConcat(a,group,bindings)
-    elif a.name=='Aggregate_Avg': 
-        return agg_Avg(a,group,bindings)
-    elif a.name=='Aggregate_Min': 
-        return agg_Min(a,group,bindings)
-    elif a.name=='Aggregate_Max': 
-        return agg_Max(a,group,bindings)
+    c = 0
+    s = 0
+    for x in group:
+        try:
+            s += numeric(_eval(a.vars, x))
+            c += 1
+        except:
+            pass  # simply dont count
+
+    if c == 0:
+        bindings[a.res] = Literal(0)
+    else:
+        bindings[a.res] = Literal(Decimal(s) / Decimal(c))
+
+
+def evalAgg(a, group, bindings):
+    if a.name == 'Aggregate_Count':
+        return agg_Count(a, group, bindings)
+    elif a.name == 'Aggregate_Sum':
+        return agg_Sum(a, group, bindings)
+    elif a.name == 'Aggregate_Sample':
+        return agg_Sample(a, group, bindings)
+    elif a.name == 'Aggregate_GroupConcat':
+        return agg_GroupConcat(a, group, bindings)
+    elif a.name == 'Aggregate_Avg':
+        return agg_Avg(a, group, bindings)
+    elif a.name == 'Aggregate_Min':
+        return agg_Min(a, group, bindings)
+    elif a.name == 'Aggregate_Max':
+        return agg_Max(a, group, bindings)
 
     else:
-        raise Exception("Unknown aggregate function "+a.name)
+        raise Exception("Unknown aggregate function " + a.name)

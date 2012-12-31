@@ -4,132 +4,135 @@ Code for carrying out Update Operations
 
 """
 
-from rdflib import BNode, Graph
+from rdflib import Graph
 
 from rdflib_sparql.sparql import QueryContext
 from rdflib_sparql.evalutils import _fillTemplate, _join
 from rdflib_sparql.evaluate import evalBGP, evalPart
 
+
 def _graphOrDefault(ctx, g):
-    if g=='DEFAULT':
+    if g == 'DEFAULT':
         return ctx.graph
     else:
         return ctx.dataset.get_context(g)
 
 
-def _graphAll(ctx, g): 
+def _graphAll(ctx, g):
     """
     return a list of graphs
     """
-    if g=='DEFAULT':
+    if g == 'DEFAULT':
         return [ctx.graph]
-    elif g=='NAMED': 
-        return [c for c in ctx.dataset.contexts() if c.identifier!=ctx.graph.identifier]
-    elif g=='ALL': 
+    elif g == 'NAMED':
+        return [c for c in ctx.dataset.contexts()
+                    if c.identifier != ctx.graph.identifier]
+    elif g == 'ALL':
         return list(ctx.dataset.contexts())
-    else: 
+    else:
         return [ctx.dataset.get_context(g)]
 
-def evalLoad(ctx,u):
+
+def evalLoad(ctx, u):
     """
     http://www.w3.org/TR/sparql11-update/#load
     """
 
-    if u.graphiri:         
+    if u.graphiri:
         ctx.load(u.iri, default=False, publicID=u.graphiri)
-    else: 
+    else:
         ctx.load(u.iri, default=True)
 
-def evalCreate(ctx,u):
+
+def evalCreate(ctx, u):
     """
     http://www.w3.org/TR/sparql11-update/#create
     """
-    g=ctx.datset.get_context(u.graphiri)
-    if len(g)>0: 
-        raise Exception("Graph %s already exists."%g.identifier)
+    g = ctx.datset.get_context(u.graphiri)
+    if len(g) > 0:
+        raise Exception("Graph %s already exists." % g.identifier)
     raise Exception("Create not implemented!")
 
-def evalClear(ctx,u):
+
+def evalClear(ctx, u):
     """
     http://www.w3.org/TR/sparql11-update/#clear
     """
 
-    for g in _graphAll(ctx,u.graphiri): 
-        g.remove((None,None,None))
+    for g in _graphAll(ctx, u.graphiri):
+        g.remove((None, None, None))
 
 
-def evalInsertData(ctx,u):
+def evalInsertData(ctx, u):
     """
     http://www.w3.org/TR/sparql11-update/#insertData
     """
     # add triples
-    g=ctx.graph
-    g+=u.triples
+    g = ctx.graph
+    g += u.triples
 
     # add quads
     # u.quads is a dict of graphURI=>[triples]
-    for g in u.quads: 
-        cg=ctx.dataset.get_context(g)
-        cg+=u.quads[g]
+    for g in u.quads:
+        cg = ctx.dataset.get_context(g)
+        cg += u.quads[g]
 
 
-def evalDeleteData(ctx,u):
+def evalDeleteData(ctx, u):
     """
     http://www.w3.org/TR/sparql11-update/#deleteData
     """
     # remove triples
-    g=ctx.graph
-    g-=u.triples
+    g = ctx.graph
+    g -= u.triples
 
     # remove quads
     # u.quads is a dict of graphURI=>[triples]
-    for g in u.quads: 
-        cg=ctx.dataset.get_context(g)
-        cg-=u.quads[g]
+    for g in u.quads:
+        cg = ctx.dataset.get_context(g)
+        cg -= u.quads[g]
 
 
-
-def evalDeleteWhere(ctx,u):
+def evalDeleteWhere(ctx, u):
     """
     http://www.w3.org/TR/sparql11-update/#deleteWhere
     """
 
-    res=evalBGP(ctx, u.triples ) 
-    for g in u.quads: 
-        cg=ctx.dataset.get_context(g)
+    res = evalBGP(ctx, u.triples)
+    for g in u.quads:
+        cg = ctx.dataset.get_context(g)
         ctx.pushGraph(cg)
-        res=_join(res, evalBGP(ctx, u.quads[g]))
+        res = _join(res, evalBGP(ctx, u.quads[g]))
         ctx.popGraph()
-    
+
     for c in res:
-        g=ctx.graph
-        g-=_fillTemplate(u.triples, c)
+        g = ctx.graph
+        g -= _fillTemplate(u.triples, c)
 
         for g in u.quads:
-            cg=ctx.dataset.get_context(g)
-            cg-=_fillTemplate(u.quads[g], c)
-            
+            cg = ctx.dataset.get_context(g)
+            cg -= _fillTemplate(u.quads[g], c)
 
-def evalModify(ctx,u):
+
+def evalModify(ctx, u):
 
     # Using replaces the dataset for evaluating the where-clause
     if u.using:
-        otherDefault=False
+        otherDefault = False
         for d in u.using:
             if d.default:
 
                 if not otherDefault:
                     # replace current default graph
-                    dg=Graph()
+                    dg = Graph()
                     ctx.pushGraph(dg)
-                    otherDefault=True
-                
+                    otherDefault = True
+
                 ctx.load(d.default, default=True)
 
             elif d.named:
-                g=d.named
+                g = d.named
                 ctx.load(g, default=False)
-                
 
     # "The WITH clause provides a convenience for when an operation
     # primarily refers to a single graph. If a graph name is specified
@@ -140,57 +143,55 @@ def evalModify(ctx,u):
     # graphs referred to in USING clauses and/or USING NAMED clauses,
     # the WITH clause will be ignored while evaluating the WHERE
     # clause."
-                
     if not u.using and u.withClause:
-        g=ctx.dataset.get_context(u.withClause)
+        g = ctx.dataset.get_context(u.withClause)
         ctx.pushGraph(g)
 
-    res=evalPart(ctx, u.where)
+    res = evalPart(ctx, u.where)
 
     if u.using:
         if otherDefault:
-            ctx.popGraph() # restore original default graph
+            ctx.popGraph()  # restore original default graph
         if u.withClause:
-            g=ctx.dataset.get_context(u.withClause)
+            g = ctx.dataset.get_context(u.withClause)
             ctx.pushGraph(g)
 
-                
     for c in res:
-        dg=ctx.graph
+        dg = ctx.graph
         if u.delete:
-            dg-=_fillTemplate(u.delete.triples, c)
+            dg -= _fillTemplate(u.delete.triples, c)
 
-            for g,q in u.delete.quads.iteritems():
-                cg=ctx.dataset.get_context(g)
-                cg-=_fillTemplate(q, c)
+            for g, q in u.delete.quads.iteritems():
+                cg = ctx.dataset.get_context(g)
+                cg -= _fillTemplate(q, c)
 
         if u.insert:
-            dg+=_fillTemplate(u.insert.triples, c)
+            dg += _fillTemplate(u.insert.triples, c)
 
-            for g,q in u.insert.quads.iteritems():
-                cg=ctx.dataset.get_context(g)
-                cg+=_fillTemplate(q, c)
+            for g, q in u.insert.quads.iteritems():
+                cg = ctx.dataset.get_context(g)
+                cg += _fillTemplate(q, c)
 
 
-def evalAdd(ctx,u):
+def evalAdd(ctx, u):
     """
 
     add all triples from src to dst
 
     http://www.w3.org/TR/sparql11-update/#add
     """
-    src,dst=u.graph
+    src, dst = u.graph
 
-    srcg=_graphOrDefault(ctx, src)
-    dstg=_graphOrDefault(ctx, dst)
+    srcg = _graphOrDefault(ctx, src)
+    dstg = _graphOrDefault(ctx, dst)
 
-    if srcg.identifier==dstg.identifier:
-        return 
+    if srcg.identifier == dstg.identifier:
+        return
 
-    dstg+=srcg
+    dstg += srcg
 
 
-def evalMove(ctx,u):
+def evalMove(ctx, u):
     """
 
     remove all triples from dst
@@ -200,47 +201,44 @@ def evalMove(ctx,u):
     http://www.w3.org/TR/sparql11-update/#move
     """
 
-    src,dst=u.graph
-    
-    srcg=_graphOrDefault(ctx, src)
-    dstg=_graphOrDefault(ctx, dst)
+    src, dst = u.graph
 
-    if srcg.identifier==dstg.identifier:
-        return 
+    srcg = _graphOrDefault(ctx, src)
+    dstg = _graphOrDefault(ctx, dst)
 
-    dstg.remove((None,None,None))
+    if srcg.identifier == dstg.identifier:
+        return
 
-    dstg+=srcg
+    dstg.remove((None, None, None))
 
-    srcg.remove((None,None,None))
+    dstg += srcg
+
+    srcg.remove((None, None, None))
 
 
-def evalCopy(ctx,u):
+def evalCopy(ctx, u):
     """
 
     remove all triples from dst
     add all triples from src to dst
-   
+
     http://www.w3.org/TR/sparql11-update/#copy
     """
 
-    src,dst=u.graph
+    src, dst = u.graph
 
-    srcg=_graphOrDefault(ctx, src)
-    dstg=_graphOrDefault(ctx, dst)
+    srcg = _graphOrDefault(ctx, src)
+    dstg = _graphOrDefault(ctx, dst)
 
-    if srcg.identifier==dstg.identifier:
-        return 
+    if srcg.identifier == dstg.identifier:
+        return
 
-    dstg.remove((None,None,None))
+    dstg.remove((None, None, None))
 
-    dstg+=srcg
-
-
+    dstg += srcg
 
 
-
-def evalUpdate(graph, update): 
+def evalUpdate(graph, update):
     """
 
     http://www.w3.org/TR/sparql11-update/#updateLanguage
@@ -260,39 +258,36 @@ def evalUpdate(graph, update):
 
     """
 
-    for u in update: 
+    for u in update:
 
-        ctx=QueryContext(graph)
+        ctx = QueryContext(graph)
 
-        try: 
-            if u.name=='Load':
+        try:
+            if u.name == 'Load':
                 evalLoad(ctx, u)
-            elif u.name=='Clear':
+            elif u.name == 'Clear':
                 evalClear(ctx, u)
-            elif u.name=='Drop':
+            elif u.name == 'Drop':
                 # rdflib does not record empty graphs, so clear == drop
-                evalClear(ctx, u) 
-            elif u.name=='Create':
+                evalClear(ctx, u)
+            elif u.name == 'Create':
                 evalCreate(ctx, u)
-            elif u.name=='Add':
+            elif u.name == 'Add':
                 evalAdd(ctx, u)
-            elif u.name=='Move':
+            elif u.name == 'Move':
                 evalMove(ctx, u)
-            elif u.name=='Copy':
+            elif u.name == 'Copy':
                 evalCopy(ctx, u)
-            elif u.name=='InsertData':
+            elif u.name == 'InsertData':
                 evalInsertData(ctx, u)
-            elif u.name=='DeleteData':
+            elif u.name == 'DeleteData':
                 evalDeleteData(ctx, u)
-            elif u.name=='DeleteWhere':
+            elif u.name == 'DeleteWhere':
                 evalDeleteWhere(ctx, u)
-            elif u.name=='Modify':
+            elif u.name == 'Modify':
                 evalModify(ctx, u)
-            else: 
-                raise Exception('Unknown update operation: %s'%(u,))
-        except: 
-            if not u.silent: raise
-
-
-
-    
+            else:
+                raise Exception('Unknown update operation: %s' % (u,))
+        except:
+            if not u.silent:
+                raise

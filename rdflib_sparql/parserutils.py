@@ -10,15 +10,15 @@ from pyparsing import TokenConverter, ParseResults
 
 from rdflib import BNode, Variable, Literal, URIRef
 
-DEBUG=True
-DEBUG=False
-if DEBUG: 
+DEBUG = True
+DEBUG = False
+if DEBUG:
     import traceback
 
 """
 
 NOTE: PyParsing setResultName/__call__ provides a very similar solution to this
-I didn't realise at the time of writing and I will remove a 
+I didn't realise at the time of writing and I will remove a
 lot of this code at some point
 
 Utility classes for creating an abstract-syntax tree out with pyparsing actions
@@ -30,20 +30,20 @@ For example:
 # [5] BaseDecl ::= 'BASE' IRIREF
 BaseDecl = Comp('Base', Keyword('BASE') + Param('iri',IRIREF))
 
-After parsing, this gives you back an CompValue object, 
-which is a dict/object with the paramters specified. 
-So you can access the parameters are attributes or as keys: 
+After parsing, this gives you back an CompValue object,
+which is a dict/object with the paramters specified.
+So you can access the parameters are attributes or as keys:
 
-baseDecl.iri 
+baseDecl.iri
 
 Comp lets you set an evalFn that is bound to the eval method of
-the resulting CompValue 
+the resulting CompValue
 
 
 """
 
 
-# This is an alternative 
+# This is an alternative
 
 # Comp('Sum')( Param('x')(Number) + '+' + Param('y')(Number) )
 
@@ -53,199 +53,204 @@ def value(ctx, val, variables=False, errors=False):
     utility function for evaluating something...
 
     Variables will be looked up in the context
-    Normally, non-bound vars is an error, 
+    Normally, non-bound vars is an error,
     set variables=True to return unbound vars
-    
-    Normally, an error raises the error, 
-    set errors=True to return error 
+
+    Normally, an error raises the error,
+    set errors=True to return error
 
     """
 
-    if isinstance(val, Expr): 
-        return val.eval(ctx) # recurse?
+    if isinstance(val, Expr):
+        return val.eval(ctx)  # recurse?
     elif isinstance(val, CompValue):
-        raise Exception("What do I do with this CompValue? %s"%val)
+        raise Exception("What do I do with this CompValue? %s" % val)
 
-    elif isinstance(val, list): 
-        return [value(ctx,x,variables,errors) for x in val]
+    elif isinstance(val, list):
+        return [value(ctx, x, variables, errors) for x in val]
 
     elif isinstance(val, (BNode, Variable)):
-        r=ctx.get(val)
-        if isinstance(r, SPARQLError) and not errors: 
+        r = ctx.get(val)
+        if isinstance(r, SPARQLError) and not errors:
             raise r
-        if r!=None: return r
+        if r is not None:
+            return r
 
         # not bound
         if variables:
             return val
-        else: 
+        else:
             raise NotBoundError
 
-    elif isinstance(val, ParseResults) and len(val)==1:
-        return value(ctx,val[0],variables,errors)
-    else: 
+    elif isinstance(val, ParseResults) and len(val) == 1:
+        return value(ctx, val[0], variables, errors)
+    else:
         return val
 
 
-
-class ParamValue(object): 
-    """ 
-    The result of parsing a Param 
+class ParamValue(object):
+    """
+    The result of parsing a Param
     This just keeps the name/value
     All cleverness is in the CompValue
     """
-    def __init__(self, name, tokenList, isList): 
-        self.isList=isList
-        self.name=name
-        if isinstance(tokenList, (list,ParseResults)) and len(tokenList)==1: 
-            tokenList=tokenList[0]
+    def __init__(self, name, tokenList, isList):
+        self.isList = isList
+        self.name = name
+        if isinstance(tokenList, (list, ParseResults)) and len(tokenList) == 1:
+            tokenList = tokenList[0]
 
-        self.tokenList=tokenList
+        self.tokenList = tokenList
 
-        
-    def __str__(self): 
-        return "Param(%s, %s)"%(self.name,self.tokenList)
+    def __str__(self):
+        return "Param(%s, %s)" % (self.name, self.tokenList)
 
 
-class Param(TokenConverter): 
+class Param(TokenConverter):
     """
     A pyparsing token for labelling a part of the parse-tree
-    if isList is true repeat occurrences of ParamList have 
+    if isList is true repeat occurrences of ParamList have
     their values merged in a list
     """
     def __init__(self, name, expr, isList=False):
-        self.name=name
-        self.isList=isList
+        self.name = name
+        self.isList = isList
         TokenConverter.__init__(self, expr)
         self.addParseAction(self.postParse2)
 
-    def postParse2(self, tokenList): 
+    def postParse2(self, tokenList):
         return ParamValue(self.name, tokenList, self.isList)
 
-class ParamList(Param): 
+
+class ParamList(Param):
     """
     A shortcut for a Param with isList=True
     """
     def __init__(self, name, expr):
         Param.__init__(self, name, expr, True)
 
+
 class plist(list):
     """this is just a list, but we want our own type to check for"""
 
     pass
 
+
 class CompValue(OrderedDict):
 
     """
     The result of parsing a Comp
-    Any included Params are avaiable as Dict keys 
+    Any included Params are avaiable as Dict keys
     or as attributes
 
     """
 
-    def __init__(self, name, **values):        
+    def __init__(self, name, **values):
         OrderedDict.__init__(self)
-        self.name=name
+        self.name = name
         self.update(values)
-            
+
     def __str__(self):
-        return self.name+"_"+OrderedDict.__str__(self)
+        return self.name + "_" + OrderedDict.__str__(self)
 
     def __repr__(self):
-        return self.name+"_"+dict.__repr__(self)
+        return self.name + "_" + dict.__repr__(self)
 
-    def _value(self,val, variables=False, errors=False): 
-        if self.ctx!=None: 
+    def _value(self, val, variables=False, errors=False):
+        if self.ctx is not None:
             return value(self.ctx, val, variables)
-        else: 
+        else:
             return val
-            
-    def __getitem__(self,a): 
-        return self._value(OrderedDict.__getitem__(self,a))
 
-    def get(self,a,variables=False, errors=False):
-        return self._value(OrderedDict.get(self,a,a), variables, errors)
+    def __getitem__(self, a):
+        return self._value(OrderedDict.__getitem__(self, a))
 
-    def __getattr__(self,a):
+    def get(self, a, variables=False, errors=False):
+        return self._value(OrderedDict.get(self, a, a), variables, errors)
+
+    def __getattr__(self, a):
         # Hack hack: OrderedDict relies on this
-        if a=='_OrderedDict__root': raise AttributeError
-        try: 
+        if a == '_OrderedDict__root':
+            raise AttributeError
+        try:
             return self[a]
-        except KeyError: 
+        except KeyError:
             #raise AttributeError('no such attribute '+a)
             return None
 
-class Expr(CompValue): 
+
+class Expr(CompValue):
     """
-    A CompValue that is evaluatable    
+    A CompValue that is evaluatable
     """
 
-    def __init__(self, name, evalfn=None, **values):        
-        super(Expr,self).__init__(name,**values)
+    def __init__(self, name, evalfn=None, **values):
+        super(Expr, self).__init__(name, **values)
 
-        self._evalfn=None
+        self._evalfn = None
         if evalfn:
-            self._evalfn=MethodType(evalfn, self)
+            self._evalfn = MethodType(evalfn, self)
 
-    def eval(self, ctx={}): 
-        try: 
-            self.ctx=ctx
+    def eval(self, ctx={}):
+        try:
+            self.ctx = ctx
             return self._evalfn(ctx)
-        except SPARQLError, e: 
+        except SPARQLError, e:
             return e
-        finally: 
-            self.ctx=None
+        finally:
+            self.ctx = None
 
 
-class Comp(TokenConverter): 
+class Comp(TokenConverter):
 
     """
-    A pyparsing token for grouping together things with a label 
-    Any sub-tokens that are not Params will be ignored. 
+    A pyparsing token for grouping together things with a label
+    Any sub-tokens that are not Params will be ignored.
 
-    Returns CompValue / Expr objects - depending on whether evalFn is set. 
+    Returns CompValue / Expr objects - depending on whether evalFn is set.
     """
 
-    def __init__(self, name, expr): 
+    def __init__(self, name, expr):
         TokenConverter.__init__(self, expr)
-        self.name=name
-        self.evalfn=None
+        self.name = name
+        self.evalfn = None
 
     def postParse(self, instring, loc, tokenList):
 
         if self.evalfn:
-            res=Expr(self.name)
-            res._evalfn=MethodType(self.evalfn, res)
+            res = Expr(self.name)
+            res._evalfn = MethodType(self.evalfn, res)
         else:
-            res=CompValue(self.name)
+            res = CompValue(self.name)
 
-        for t in tokenList: 
-            if isinstance(t,ParamValue):
+        for t in tokenList:
+            if isinstance(t, ParamValue):
                 if t.isList:
-                    if not t.name in res: res[t.name]=plist()
+                    if not t.name in res:
+                        res[t.name] = plist()
                     res[t.name].append(t.tokenList)
                 else:
-                    res[t.name]=t.tokenList
+                    res[t.name] = t.tokenList
                 #res.append(t.tokenList)
             #if isinstance(t,CompValue):
             #    res.update(t)
         return res
 
-    def setEvalFn(self,evalfn):
-        self.evalfn=evalfn
+    def setEvalFn(self, evalfn):
+        self.evalfn = evalfn
         return self
-    
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     from pyparsing import Word, nums
     import sys
 
     Number = Word(nums)
     Number.setParseAction(lambda x: int(x[0]))
-    Plus = Comp('plus', Param('a',Number) + '+' + Param('b',Number) )
-    Plus.setEvalFn(lambda self,ctx: self.a+self.b)
+    Plus = Comp('plus', Param('a', Number) + '+' + Param('b', Number))
+    Plus.setEvalFn(lambda self, ctx: self.a + self.b)
 
-    r=Plus.parseString(sys.argv[1])
+    r = Plus.parseString(sys.argv[1])
     print r
     print r[0].eval({})
 
