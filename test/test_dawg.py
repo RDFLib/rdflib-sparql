@@ -2,7 +2,7 @@ import sys
 
 # Needed to pass
 # http://www.w3.org/2009/sparql/docs/tests/data-sparql11/
-# syntax-update-2/manifest#syntax-update-other-01
+#           syntax-update-2/manifest#syntax-update-other-01
 sys.setrecursionlimit(6000)  # default is 1000
 
 
@@ -79,7 +79,7 @@ EARL_REPORT.add((me, FOAF.name, Literal("Gunnar Aastrand Grimnes")))
 
 try:
     skiptests = dict([(URIRef(x.strip().split(
-        "\t")[0]), x.strip().split("\t")[1]) for x in file("skiptests.list")])
+        "\t")[0]), x.strip().split("\t")[1]) for x in open("skiptests.list")])
 except IOError:
     skiptests = set()
 
@@ -169,10 +169,10 @@ def update_test(t):
 
         if not res:
             if syntax:
-                translateUpdate(parseUpdate(file(query[7:])))
+                translateUpdate(parseUpdate(open(query[7:])))
             else:
                 try:
-                    translateUpdate(parseUpdate(file(query[7:])))
+                    translateUpdate(parseUpdate(open(query[7:])))
                     raise AssertionError("Query shouldn't have parsed!")
                 except:
                     pass  # negative syntax test
@@ -188,7 +188,7 @@ def update_test(t):
             for x, l in graphdata:
                 g.load(x, publicID=URIRef(l), format=_fmt(x))
 
-        req = translateUpdate(parseUpdate(file(query[7:])))
+        req = translateUpdate(parseUpdate(open(query[7:])))
         evalUpdate(g, req)
 
         # read expected results
@@ -216,7 +216,7 @@ def update_test(t):
 
         if isinstance(e, AssertionError):
             failed_tests.append(uri)
-            fails[e.message] += 1
+            fails[str(e)] += 1
         else:
             error_tests.append(uri)
             errors[str(e)] += 1
@@ -236,40 +236,40 @@ def update_test(t):
             if data:
                 print "----------------- DATA --------------------"
                 print ">>>", data
-                print file(data[7:]).read()
+                print open(data[7:]).read()
             if graphdata:
                 print "----------------- GRAPHDATA --------------------"
                 for x, l in graphdata:
                     print ">>>", x, l
-                    print file(x[7:]).read()
+                    print open(x[7:]).read()
 
             print "----------------- Request -------------------"
             print ">>>", query
-            print file(query[7:]).read()
+            print open(query[7:]).read()
 
             if res:
                 if resdata:
                     print "----------------- RES DATA --------------------"
                     print ">>>", resdata
-                    print file(resdata[7:]).read()
+                    print open(resdata[7:]).read()
                 if resgraphdata:
                     print "----------------- RES GRAPHDATA -------------------"
                     for x, l in resgraphdata:
                         print ">>>", x, l
-                        print file(x[7:]).read()
+                        print open(x[7:]).read()
 
             print "------------- MY RESULT ----------"
             print g.serialize(format='trig')
 
             try:
-                pq = translateUpdate(parseUpdate(file(query[7:]).read()))
+                pq = translateUpdate(parseUpdate(open(query[7:]).read()))
                 print "----------------- Parsed ------------------"
                 #pprintAlgebra(pq)
                 print pq
             except:
                 print "(parser error)"
 
-            print e.message.decode('string-escape')
+            print e.decode('string-escape')
 
             import pdb
             pdb.post_mortem()
@@ -288,7 +288,7 @@ def query_test(t):
 
     def skip(reason='(none)'):
         print "Skipping %s from now on." % uri
-        f = file("skiptests.list", "a")
+        f = open("skiptests.list", "a")
         f.write("%s\t%s\n" % (uri, reason))
         f.close()
 
@@ -306,12 +306,12 @@ def query_test(t):
 
             if syntax:
                 translateQuery(parseQuery(
-                    file(query[7:]).read()), base=urljoin(query, '.'))
+                    open(query[7:]).read()), base=urljoin(query, '.'))
             else:
                 # negative syntax test
                 try:
                     translateQuery(parseQuery(
-                        file(query[7:]).read()), base=urljoin(query, '.'))
+                        open(query[7:]).read()), base=urljoin(query, '.'))
 
                     assert False, 'Query should not have parsed!'
                 except:
@@ -319,7 +319,7 @@ def query_test(t):
             return
 
         # eval test - carry out query
-        res2 = g.query(file(query[7:]).read(), base=urljoin(query, '.'))
+        res2 = g.query(open(query[7:]).read(), base=urljoin(query, '.'))
 
         if resfile.endswith('ttl'):
             resg = Graph()
@@ -330,12 +330,12 @@ def query_test(t):
             resg.load(resfile, publicID=resfile)
             res = RDFResultParser().parse(resg)
         elif resfile.endswith('srj'):
-            res = Result.parse(file(resfile[7:]), format='json')
+            res = Result.parse(open(resfile[7:]), format='json')
         elif resfile.endswith('tsv'):
-            res = Result.parse(file(resfile[7:]), format='tsv')
+            res = Result.parse(open(resfile[7:]), format='tsv')
 
         elif resfile.endswith('csv'):
-            res = Result.parse(file(resfile[7:]), format='csv')
+            res = Result.parse(open(resfile[7:]), format='csv')
 
             # CSV is lossy, round-trip our own resultset to
             # lose the same info :)
@@ -345,7 +345,7 @@ def query_test(t):
             res2 = Result.parse(s, format='csv')
 
         else:
-            res = Result.parse(file(resfile[7:]), format='xml')
+            res = Result.parse(open(resfile[7:]), format='xml')
 
         if not DETAILEDASSERT:
             eq(res.type, res2.type, 'Types do not match')
@@ -394,7 +394,7 @@ def query_test(t):
 
         if isinstance(e, AssertionError):
             failed_tests.append(uri)
-            fails[e.message] += 1
+            fails[str(e)] += 1
         else:
             error_tests.append(uri)
             errors[str(e)] += 1
@@ -414,23 +414,23 @@ def query_test(t):
             if data:
                 print "----------------- DATA --------------------"
                 print ">>>", data
-                print file(data[7:]).read()
+                print open(data[7:]).read()
             if graphdata:
                 print "----------------- GRAPHDATA --------------------"
                 for x in graphdata:
                     print ">>>", x
-                    print file(x[7:]).read()
+                    print open(x[7:]).read()
 
             print "----------------- Query -------------------"
             print ">>>", query
-            print file(query[7:]).read()
+            print open(query[7:]).read()
             if resfile:
                 print "----------------- Res -------------------"
                 print ">>>", resfile
-                print file(resfile[7:]).read()
+                print open(resfile[7:]).read()
 
             try:
-                pq = parseQuery(file(query[7:]).read())
+                pq = parseQuery(open(query[7:]).read())
                 print "----------------- Parsed ------------------"
                 pprintAlgebra(translateQuery(pq, base=urljoin(query, '.')))
             except:
@@ -438,7 +438,7 @@ def query_test(t):
 
             #import traceback
             #traceback.print_exc()
-            print e.message.decode('string-escape')
+            print e.decode('string-escape')
 
             import pdb
             pdb.post_mortem()
@@ -644,10 +644,10 @@ if __name__ == '__main__':
 
         now = isodate.datetime_isoformat(datetime.datetime.utcnow())
 
-        tf = file("testruns.txt", "a")
-        tf.write("%s\n%d tests, %d passed, %d failed, %d errors, \
-                 %d skipped (%.2f%% success)\n\n" % (
-                    now, i, success, f, e, skip, 100. * success / i))
+        tf = open("testruns.txt", "a")
+        tf.write("%s\n%d tests, %d passed, %d failed, %d errors, %d " + \
+                 "skipped (%.2f%% success)\n\n" % (
+                            now, i, success, f, e, skip, 100. * success / i))
         tf.close()
 
         earl_report = 'test_reports/earl_%s.ttl' % now

@@ -78,3 +78,10 @@ http://www.w3.org/2009/sparql/docs/tests/data-sparql11/entailment/manifest#simpl
 http://www.w3.org/2009/sparql/docs/tests/data-sparql11/entailment/manifest#simple6	entailment not implemented
 http://www.w3.org/2009/sparql/docs/tests/data-sparql11/entailment/manifest#simple7	entailment not implemented
 http://www.w3.org/2009/sparql/docs/tests/data-sparql11/entailment/manifest#simple8	entailment not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service1	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service2	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service3	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service4a	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service5	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service6	service not implemented
+http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service7	service not implemented

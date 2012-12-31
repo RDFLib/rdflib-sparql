@@ -113,7 +113,7 @@ def Builtin_UUID(expr, ctx):
     http://www.w3.org/TR/sparql11-query/#func-strdt
     """
 
-    return URIRef(uuid.uuid4().get_urn())
+    return URIRef(uuid.uuid4().urn)
 
 
 def Builtin_STRUUID(expr, ctx):
