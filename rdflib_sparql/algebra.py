@@ -599,6 +599,7 @@ def translateUpdate1(u, prologue):
     else:
         raise Exception('Unknown type of update operation: %s' % u)
 
+    u.prologue=prologue
     return u
 
 

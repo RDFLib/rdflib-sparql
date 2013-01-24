@@ -261,6 +261,7 @@ def evalUpdate(graph, update):
     for u in update:
 
         ctx = QueryContext(graph)
+        ctx.prologue=u.prologue
 
         try:
             if u.name == 'Load':
