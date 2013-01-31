@@ -110,7 +110,7 @@ def evalDeleteWhere(ctx, u):
         g -= _fillTemplate(u.triples, c)
 
         for g in u.quads:
-            cg = ctx.dataset.get_context(g)
+            cg = ctx.dataset.get_context(c.get(g))
             cg -= _fillTemplate(u.quads[g], c)
 
 
@@ -162,14 +162,14 @@ def evalModify(ctx, u):
             dg -= _fillTemplate(u.delete.triples, c)
 
             for g, q in u.delete.quads.iteritems():
-                cg = ctx.dataset.get_context(g)
+                cg = ctx.dataset.get_context(c.get(g))
                 cg -= _fillTemplate(q, c)
 
         if u.insert:
             dg += _fillTemplate(u.insert.triples, c)
 
             for g, q in u.insert.quads.iteritems():
-                cg = ctx.dataset.get_context(g)
+                cg = ctx.dataset.get_context(c.get(g))
                 cg += _fillTemplate(q, c)
 
 
