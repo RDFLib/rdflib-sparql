@@ -713,8 +713,8 @@ def RelationalExpression(e, ctx):
 
     ops = dict([('>', pyop.gt),
                 ('<', pyop.lt),
-                ('=', pyop.eq),
-                ('!=', pyop.ne),
+                ('=', lambda x,y: x.eq(y)),
+                ('!=', lambda x,y: x.neq(y)),
                 ('>=', pyop.ge),
                 ('<=', pyop.le),
                 ('IN', pyop.contains),
@@ -762,39 +762,15 @@ def RelationalExpression(e, ctx):
 
     if isinstance(expr, Literal) and isinstance(other, Literal):
 
-        # if plain or XSD dt we can convert and do many things
-        if (not expr.datatype and not other.datatype) or \
-                (expr.datatype in XSD_DTs and other.datatype in XSD_DTs):
-            pass
-        else:
-            # if non-XSD DT, they must be equal
-            if expr.datatype != other.datatype:
-                raise SPARQLError(
-                    'Cannot compare literals with non-matching' + \
-                    'non-XSD datatypes')
-            # and for non-XSD DTs we can only do =,!=
-            if op not in ('=', '!='):
-                raise SPARQLError(
-                    'Can only do =,!= comparisons of non-XSD Literals')
-            # lang-tag has to be case insensitive equal
-            if (expr.language or "").lower() != (other.language or "").lower():
-                raise SPARQLError(
-                    'Cannot compare literals with non-matching language tags')
+        if not (expr.datatype in XSD_DTs and other.datatype in XSD_DTs):
+            # in SPARQL for non-XSD DT Literals we can only do =,!= 
+            if op not in ('=', '!='): 
+                raise SPARQLError('Can only do =,!= comparisons of non-XSD Literals')
 
-        # # finally compare lexical forms
-
-        # if unicode(expr)!=unicode(other):
-        #     if expr.datatype and expr.datatype not in XSD_DTs:
-        #         raise SPARQLError(
-        #                'I do not know how to compare literals with ' + \
-        #                'datatype: %s' % expr.datatype)
-        #     if other.datatype and other.datatype not in XSD_DTs:
-        #         raise SPARQLError(
-        #                'I do not know how to compare literals with ' + \
-        #                'datatype: %s' % other.datatype)
-
-    return Literal(ops[op](expr, other))
-
+    r=ops[op](expr, other)
+    if r==NotImplemented: 
+        raise SPARQLError('Error when comparing')
+    return Literal(r)
 
 def ConditionalAndExpression(e, ctx):
 
