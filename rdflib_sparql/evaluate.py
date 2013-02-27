@@ -16,7 +16,7 @@ also return a dict of list of dicts
 
 import collections
 
-from rdflib import Variable, Graph, BNode
+from rdflib import Variable, Graph, BNode, URIRef, Literal
 
 from rdflib_sparql import CUSTOM_EVALS
 from rdflib_sparql.parserutils import value
@@ -279,10 +279,15 @@ def evalOrderBy(ctx, part):
     for e in reversed(part.expr):
 
         def val(x):
-            try:
-                return value(x, e.expr)
-            except:
-                return None
+            v = value(x, e.expr, variables=True)
+            if isinstance(v, Variable):
+                return (0, v)
+            elif isinstance(v, BNode):
+                return (1, v)
+            elif isinstance(v, URIRef):
+                return (2, v)
+            elif isinstance(v, Literal):
+                return (3, v)
 
         reverse = bool(e.order and e.order == 'DESC')
         res = sorted(res, key=val, reverse=reverse)
