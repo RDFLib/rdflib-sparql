@@ -4,7 +4,7 @@ Code for carrying out Update Operations
 
 """
 
-from rdflib import Graph
+from rdflib import Graph, Variable
 
 from rdflib_sparql.sparql import QueryContext
 from rdflib_sparql.evalutils import _fillTemplate, _join
@@ -238,7 +238,7 @@ def evalCopy(ctx, u):
     dstg += srcg
 
 
-def evalUpdate(graph, update):
+def evalUpdate(graph, update, initBindings=None):
     """
 
     http://www.w3.org/TR/sparql11-update/#updateLanguage
@@ -262,6 +262,13 @@ def evalUpdate(graph, update):
 
         ctx = QueryContext(graph)
         ctx.prologue=u.prologue
+
+        if initBindings:
+            for k, v in initBindings.iteritems():
+                if not isinstance(k, Variable):
+                    k = Variable(k)
+                ctx[k] = v
+            ctx.push()  # nescessary?
 
         try:
             if u.name == 'Load':
