@@ -164,6 +164,9 @@ def update_test(t):
 
     uri, name, comment, data, graphdata, query, res, syntax = t
 
+    if uri in skiptests:
+        raise SkipTest()
+
     try:
         g = ConjunctiveGraph()
 
