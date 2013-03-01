@@ -38,7 +38,7 @@ DEBUG_ERROR = True
 DEBUG_ERROR = False
 
 SPARQL10Tests = True
-SPARQL10Tests = False
+#SPARQL10Tests = False
 
 SPARQL11Tests = True
 #SPARQL11Tests=False
@@ -269,7 +269,7 @@ def update_test(t):
             except:
                 print "(parser error)"
 
-            print e.decode('string-escape')
+            print unicode(e).decode('string-escape')
 
             import pdb
             pdb.post_mortem()
@@ -436,9 +436,7 @@ def query_test(t):
             except:
                 print "(parser error)"
 
-            #import traceback
-            #traceback.print_exc()
-            print e.decode('string-escape')
+            print unicode(e).decode('string-escape')
 
             import pdb
             pdb.post_mortem()
@@ -645,8 +643,8 @@ if __name__ == '__main__':
         now = isodate.datetime_isoformat(datetime.datetime.utcnow())
 
         tf = open("testruns.txt", "a")
-        tf.write("%s\n%d tests, %d passed, %d failed, %d errors, %d " + \
-                 "skipped (%.2f%% success)\n\n" % (
+        tf.write("%s\n%d tests, %d passed, %d failed, %d errors, %d \
+                 skipped (%.2f%% success)\n\n" % (
                             now, i, success, f, e, skip, 100. * success / i))
         tf.close()
 
