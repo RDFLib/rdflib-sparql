@@ -9,7 +9,8 @@ sys.setrecursionlimit(6000)  # default is 1000
 import collections
 import datetime
 import isodate
-from StringIO import StringIO
+
+
 
 from rdflib import (
     ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef, BNode, Literal)
@@ -28,7 +29,16 @@ from nose import SkipTest
 
 from urlparse import urljoin
 
+from StringIO import StringIO
+
+if sys.version_info[0:2]<(2,7):
+    from StringIO import StringIO as BytesIO
+else: 
+    from io import BytesIO
+    
+
 # do not resolve URIs looking for more data
+
 
 
 DEBUG_FAIL = True
@@ -89,6 +99,13 @@ def _fmt(f):
         return "xml"
     return "turtle"
 
+def decode(s): 
+    if sys.version_info[0]==2:
+        return s.decode('string-escape')
+    elif sys.version_info[0]==3:
+        # I love py3, isn't this marvellously convenient? 
+        return bytes(s, "utf-8").decode("unicode_escape")
+        
 
 def bindingsCompatible(a, b):
 
@@ -272,7 +289,7 @@ def update_test(t):
             except:
                 print "(parser error)"
 
-            print unicode(e).decode('string-escape')
+            print decode(unicode(e))
 
             import pdb
             pdb.post_mortem()
@@ -342,9 +359,12 @@ def query_test(t):
 
             # CSV is lossy, round-trip our own resultset to
             # lose the same info :)
-            s = StringIO()
+
+            # write bytes, read strings...
+            s = BytesIO()
             res2.serialize(s, format='csv')
-            s = StringIO(s.getvalue())  # hmm ?
+            print s.getvalue()
+            s = StringIO(s.getvalue().decode('utf-8'))  # hmm ?
             res2 = Result.parse(s, format='csv')
 
         else:
@@ -439,7 +459,7 @@ def query_test(t):
             except:
                 print "(parser error)"
 
-            print unicode(e).decode('string-escape')
+            print decode(unicode(e))
 
             import pdb
             pdb.post_mortem()
