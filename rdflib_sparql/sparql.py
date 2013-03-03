@@ -8,7 +8,7 @@ from rdflib import Variable, BNode, Graph, ConjunctiveGraph, URIRef, Literal
 from parserutils import CompValue
 
 import rdflib_sparql
-
+from rdflib_sparql.compat import Mapping,MutableMapping
 
 class SPARQLError(Exception):
     def __init__(self, msg=None):
@@ -31,7 +31,7 @@ class SPARQLTypeError(SPARQLError):
         SPARQLError.__init__(self, msg)
 
 
-class Bindings(collections.MutableMapping):
+class Bindings(MutableMapping):
 
     """
 
@@ -81,7 +81,7 @@ class Bindings(collections.MutableMapping):
             d = d.outer
 
 
-class FrozenBindings(collections.Mapping):
+class FrozenBindings(Mapping):
     """
     An immutable hashable dict
 

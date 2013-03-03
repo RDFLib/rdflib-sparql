@@ -1,14 +1,11 @@
 
 from types import MethodType
 
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
+from rdflib_sparql.compat import OrderedDict
 
 from pyparsing import TokenConverter, ParseResults
 
-from rdflib import BNode, Variable, Literal, URIRef
+from rdflib import BNode, Variable, URIRef
 
 DEBUG = True
 DEBUG = False
@@ -170,7 +167,7 @@ class CompValue(OrderedDict):
 
     def __getattr__(self, a):
         # Hack hack: OrderedDict relies on this
-        if a == '_OrderedDict__root':
+        if a in ( '_OrderedDict__root', '_OrderedDict__end'):
             raise AttributeError
         try:
             return self[a]

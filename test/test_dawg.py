@@ -6,7 +6,24 @@ import sys
 sys.setrecursionlimit(6000)  # default is 1000
 
 
-import collections
+try: 
+    from collections import Counter
+except: 
+
+    # cheap Counter impl for py 2.5
+    # not a complete implementation - only good enough for the use here!
+    from collections import defaultdict
+    from operator import itemgetter
+
+    class Counter(defaultdict): 
+        def __init__(self): 
+            defaultdict.__init__(self, int)
+        def most_common(self,N):
+            return [x[0] for x in sorted(self.items(), 
+                                         key=itemgetter(1), 
+                                         reverse=True)[:10]]
+    
+
 import datetime
 import isodate
 
@@ -69,8 +86,8 @@ EARL = Namespace("http://www.w3.org/ns/earl#")
 
 NAME = None
 
-fails = collections.Counter()
-errors = collections.Counter()
+fails = Counter()
+errors = Counter()
 
 failed_tests = []
 error_tests = []
