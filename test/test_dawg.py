@@ -24,6 +24,8 @@ from rdflib_sparql.parser import parseQuery, parseUpdate
 from rdflib_sparql.results.rdfresults import RDFResultParser
 from rdflib_sparql.update import evalUpdate
 
+from rdflib_sparql.py3compat import decodeStringEscape
+
 from nose.tools import nottest, eq_ as eq
 from nose import SkipTest
 
@@ -99,13 +101,7 @@ def _fmt(f):
         return "xml"
     return "turtle"
 
-def decode(s): 
-    if sys.version_info[0]==2:
-        return s.decode('string-escape')
-    elif sys.version_info[0]==3:
-        # I love py3, isn't this marvellously convenient? 
-        return bytes(s, "utf-8").decode("unicode_escape")
-        
+
 
 def bindingsCompatible(a, b):
 
@@ -289,7 +285,7 @@ def update_test(t):
             except:
                 print "(parser error)"
 
-            print decode(unicode(e))
+            print decodeStringEscape(unicode(e))
 
             import pdb
             pdb.post_mortem()
@@ -459,7 +455,7 @@ def query_test(t):
             except:
                 print "(parser error)"
 
-            print decode(unicode(e))
+            print decodeStringEscape(unicode(e))
 
             import pdb
             pdb.post_mortem()
