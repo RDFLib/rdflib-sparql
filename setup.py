@@ -50,6 +50,9 @@ requires = ['rdflib>3.2']
 
 kwargs = {}
 
+if sys.version_info[:2] < (2, 6): 
+    requires.append("simplejson")
+
 if sys.version_info[:2] < (2, 7):
     requires.append("ordereddict")
 
