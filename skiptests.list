@@ -1,3 +1,5 @@
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-2	xsd:date not supported
+http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#date-3	xsd:date not supported
 http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service1	service not implemented
 http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service2	service not implemented
 http://www.w3.org/2009/sparql/docs/tests/data-sparql11/service/manifest#service3	service not implemented

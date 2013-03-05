@@ -56,9 +56,9 @@ else:
     from io import BytesIO
     
 
-# do not resolve URIs looking for more data
-
-
+# Several tests rely on lexical form of literals being kept!
+import rdflib
+rdflib.NORMALIZE_LITERALS=False
 
 DEBUG_FAIL = True
 DEBUG_FAIL = False
@@ -119,6 +119,41 @@ def _fmt(f):
     return "turtle"
 
 
+def _bindingsTable(b): 
+
+    def termString(t):
+        if t==None: return "-"
+        return repr(t).replace('rdflib.term.','').replace("datatype=URIRef(u'http://www.w3.org/2001/XMLSchema#",'datatype=xsd:').replace("datatype=URIRef(u'","datatype=")
+
+    def c(s, w): 
+        """
+        center the string s in w wide string
+        """
+        h=(w-len(s))/2
+        return " "*h+s+" "*h
+
+    if not b: 
+        return "(no results)\n"
+    else: 
+        out=StringIO()
+        keys=set()
+        for r in b: 
+            keys.update(r.keys())
+        
+        keys=sorted(keys)
+        maxlen=[0]*len(keys)
+        b=[ [ termString(r.get(k)) for k in keys] for r in b ]
+        for r in b:             
+            for i in range(len(keys)):
+                maxlen[i]=max(maxlen[i],1+len(r[i]))
+
+        out.write( "|".join([c(k,maxlen[i]) for i,k in enumerate(keys)])+"\n")
+        out.write( "-"*sum(maxlen) +"\n") 
+        for r in sorted(b):
+            out.write( "|".join(
+                    [t+" "*(i-len(t)-1) for i, t in zip(maxlen, r)]) +"\n")
+        return out.getvalue()
+                   
 
 def bindingsCompatible(a, b):
 
@@ -153,13 +188,18 @@ def bindingsCompatible(a, b):
                 return False
             if isinstance(b1, BNode):
                 if b1 in m:
-                    if y[v1] != m[b1]:
+                    if y[v1]!=m[b1]:
                         return False
                 else:
                     m[b1] = y[v1]
             else:
-                if y[v1] != b1:
-                    return False
+                 # if y[v1]!=b1: 
+                 #    return False
+                  try: 
+                      if y[v1].neq(b1):
+                          return False
+                  except TypeError: 
+                      return False
         return True
 
     if not a:
@@ -387,12 +427,13 @@ def query_test(t):
             eq(res.type, res2.type, 'Types do not match')
             if res.type == 'SELECT':
                 eq(set(res.vars), set(res2.vars), 'Vars do not match')
-                assert bindingsCompatible(
+                comp=bindingsCompatible(
                             set(frozenset(x.iteritems())
                                 for x in res.bindings),
                             set(frozenset(x.iteritems())
                                 for x in res2.bindings)
-                            ), 'Bindings do not match'
+                            )
+                assert comp, 'Bindings do not match'
             elif res.type == 'ASK':
                 eq(res.askAnswer, res2.askAnswer, 'Ask answer does not match')
             elif res.type in ('DESCRIBE', 'CONSTRUCT'):
@@ -413,16 +454,16 @@ def query_test(t):
                                 for x in res.bindings),
                         set(frozenset(x.iteritems())
                                 for x in res2.bindings)
-                        ), 'Bindings do not match: %r != %r' % (
-                        pp_binding(res.bindings),
-                        pp_binding(res2.bindings))
+                        ), 'Bindings do not match: \n%s\n!=\n%s' % (
+                        _bindingsTable(res.bindings),
+                        _bindingsTable(res2.bindings))
             elif res.type == 'ASK':
                 eq(res.askAnswer,
                    res2.askAnswer, "Ask answer does not match: %r != %r" % (
                                             res.askAnswer, res2.askAnswer))
             elif res.type in ('DESCRIBE', 'CONSTRUCT'):
                 assert isomorphic(
-                    res.graph, res2.graph), 'graphs are no isomorphic!'
+                    res.graph, res2.graph), 'graphs are not isomorphic!'
             else:
                 raise Exception('Unknown result type: %s' % res.type)
 
@@ -471,6 +512,8 @@ def query_test(t):
                 pprintAlgebra(translateQuery(pq, base=urljoin(query, '.')))
             except:
                 print "(parser error)"
+
+
 
             print decodeStringEscape(unicode(e))
 

@@ -23,7 +23,13 @@ def agg_Sum(a, group, bindings):
 
     for x in group:
         try:
-            c += numeric(_eval(a.vars, x))
+            n = numeric(_eval(a.vars, x))
+            if type(c) == float and type(n)==Decimal: 
+                c+=float(n)
+            elif type(n) == float and type(c)==Decimal:
+                c=float(c)+n
+            else:                    
+                c+=n
         except:
             pass  # simply dont count
 
@@ -41,7 +47,7 @@ def agg_Min(a, group, bindings):
             else:
                 m = min(v, m)
         except:
-            pass  # simply dont count
+            return # error in aggregate => no binding
 
     if m is not None:
         bindings[a.res] = Literal(m)
@@ -58,7 +64,8 @@ def agg_Max(a, group, bindings):
             else:
                 m = max(v, m)
         except:
-            pass  # simply dont count
+            return # error in aggregate => no binding
+
 
     if m is not None:
         bindings[a.res] = Literal(m)
@@ -73,7 +80,8 @@ def agg_Count(a, group, bindings):
                 _eval(a.vars, x)
             c += 1
         except:
-            pass  # simply dont count
+            return # error in aggregate => no binding
+            #pass  # simply dont count
 
     bindings[a.res] = Literal(c)
 
@@ -97,16 +105,27 @@ def agg_Avg(a, group, bindings):
 
     c = 0
     s = 0
+    flt=False
     for x in group:
         try:
-            s += numeric(_eval(a.vars, x))
+            n = numeric(_eval(a.vars, x))
+            if type(s) == float and type(n)==Decimal: 
+                s+=float(n)
+            elif type(n) == float and type(s)==Decimal:
+                s=float(s)+n
+                flt=True
+            else: 
+                s += n
             c += 1
         except:
+            return # error in aggregate => no binding
             pass  # simply dont count
 
     if c == 0:
         bindings[a.res] = Literal(0)
-    else:
+    elif flt:
+        bindings[a.res] = Literal(s/c)
+    else: 
         bindings[a.res] = Literal(Decimal(s) / Decimal(c))
 
 

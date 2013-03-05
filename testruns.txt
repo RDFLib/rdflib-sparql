@@ -160,3 +160,66 @@
 2013-03-01T09:39:33
 741 tests, 663 passed, 71 failed, 7 errors, 0                  skipped (89.47% success)
 
+2013-03-05T08:58:11
+741 tests, 635 passed, 58 failed, 0 errors, 48                  skipped (85.70% success)
+
+2013-03-05T09:41:38
+741 tests, 637 passed, 56 failed, 0 errors, 48                  skipped (85.96% success)
+
+2013-03-05T10:19:49
+741 tests, 639 passed, 53 failed, 1 errors, 48                  skipped (86.23% success)
+
+2013-03-05T10:22:43
+741 tests, 640 passed, 52 failed, 1 errors, 48                  skipped (86.37% success)
+
+2013-03-05T10:48:10
+741 tests, 644 passed, 48 failed, 1 errors, 48                  skipped (86.91% success)
+
+2013-03-05T10:56:36
+741 tests, 646 passed, 46 failed, 1 errors, 48                  skipped (87.18% success)
+
+2013-03-05T12:47:08
+741 tests, 651 passed, 41 failed, 1 errors, 48                  skipped (87.85% success)
+
+2013-03-05T12:58:17
+741 tests, 655 passed, 37 failed, 1 errors, 48                  skipped (88.39% success)
+
+2013-03-05T13:28:13
+741 tests, 657 passed, 36 failed, 0 errors, 48                  skipped (88.66% success)
+
+2013-03-05T13:31:32
+741 tests, 659 passed, 34 failed, 0 errors, 48                  skipped (88.93% success)
+
+2013-03-05T13:45:22
+741 tests, 665 passed, 28 failed, 0 errors, 48                  skipped (89.74% success)
+
+2013-03-05T13:54:06
+741 tests, 669 passed, 24 failed, 0 errors, 48                  skipped (90.28% success)
+
+2013-03-05T14:00:18
+741 tests, 671 passed, 22 failed, 0 errors, 48                  skipped (90.55% success)
+
+2013-03-05T14:04:47
+741 tests, 670 passed, 23 failed, 0 errors, 48                  skipped (90.42% success)
+
+2013-03-05T14:12:36
+741 tests, 672 passed, 21 failed, 0 errors, 48                  skipped (90.69% success)
+
+2013-03-05T14:21:32
+741 tests, 672 passed, 20 failed, 1 errors, 48                  skipped (90.69% success)
+
+2013-03-05T14:22:48
+741 tests, 673 passed, 20 failed, 0 errors, 48                  skipped (90.82% success)
+
+2013-03-05T14:27:10
+741 tests, 674 passed, 19 failed, 0 errors, 48                  skipped (90.96% success)
+
+2013-03-05T14:44:30
+741 tests, 673 passed, 20 failed, 0 errors, 48                  skipped (90.82% success)
+
+2013-03-05T15:05:16
+741 tests, 677 passed, 16 failed, 0 errors, 48                  skipped (91.36% success)
+
+2013-03-05T15:42:11
+741 tests, 678 passed, 15 failed, 0 errors, 48                  skipped (91.50% success)
+
