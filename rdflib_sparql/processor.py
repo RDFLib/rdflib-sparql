@@ -18,19 +18,19 @@ from rdflib_sparql.evaluate import evalQuery
 from rdflib_sparql.update import evalUpdate
 
 
-def prepareQuery(queryString):
+def prepareQuery(queryString, initNs={}, base=None):
     """
     Parse and translate a SPARQL Query
     """
-    return translateQuery(parseQuery(queryString))
+    return translateQuery(parseQuery(queryString), base, initNs)
 
 
-def processUpdate(graph, updateString):
+def processUpdate(graph, updateString, initBindings={}, initNs={}, base=None):
     """
     Process a SPARQL Update Request
     returns Nothing on success or raises Exceptions on error
     """
-    evalUpdate(graph, translateUpdate(parseUpdate(updateString)))
+    evalUpdate(graph, translateUpdate(parseUpdate(updateString), base, initNs), initBindings)
 
 
 class SPARQLResult(Result):

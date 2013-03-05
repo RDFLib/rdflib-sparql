@@ -13,7 +13,7 @@ import uuid
 import hashlib
 import urllib2
 
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 import operator as pyop  # python operators
 
@@ -179,7 +179,15 @@ def Builtin_ROUND(expr, ctx):
     """
     http://www.w3.org/TR/sparql11-query/#func-round
     """
-    return Literal(round(numeric(expr.arg)))
+
+    # This used to be just math.bound
+    # but in py3k bound was changed to 
+    # "round-to-even" behaviour
+    # this is an ugly work-around
+
+    v=numeric(expr.arg)
+    v=int(Decimal(v).quantize(1, ROUND_HALF_UP))
+    return Literal(v)
 
 
 def Builtin_REGEX(expr, ctx):

@@ -11,6 +11,7 @@ from pyparsing import CaselessKeyword as Keyword  # watch out :)
 from parserutils import Comp, Param, ParamList
 
 import rdflib_sparql.operators as op
+from rdflib_sparql.py3compat import decodeStringEscape
 
 import rdflib
 
@@ -254,15 +255,13 @@ DOUBLE_NEGATIVE.setParseAction(lambda x: neg(x[0]))
 #STRING_LITERAL_LONG1 = Literal("'''") + ( Optional( Literal("'") | "''" ) + ZeroOrMore( ~ Literal("'\\") | ECHAR ) ) + "'''"
 STRING_LITERAL_LONG1 = Regex(ur"'''((?:'|'')?(?:[^'\\]|\\['ntbrf\\]))*'''")
 STRING_LITERAL_LONG1.setParseAction(
-    lambda x: rdflib.Literal(x[0][3:-3].decode('string-escape')
-                if not rdflib.py3compat.PY3 else x[0][3:-3]))
+    lambda x: rdflib.Literal(decodeStringEscape(x[0][3:-3])))
 
 # [159] STRING_LITERAL_LONG2 ::= '"""' ( ( '"' | '""' )? ( [^"\] | ECHAR ) )* '"""'
 #STRING_LITERAL_LONG2 = Literal('"""') + ( Optional( Literal('"') | '""' ) + ZeroOrMore( ~ Literal('"\\') | ECHAR ) ) +  '"""'
 STRING_LITERAL_LONG2 = Regex(ur'"""(?:(?:"|"")?(?:[^"\\]|\\["ntbrf\\]))*"""')
 STRING_LITERAL_LONG2.setParseAction(
-    lambda x: rdflib.Literal(x[0][3:-3].decode('string-escape')
-                if not rdflib.py3compat.PY3 else x[0][3:-3]))
+    lambda x: rdflib.Literal(decodeStringEscape(x[0][3:-3])))
 
 # [156] STRING_LITERAL1 ::= "'" ( ([^#x27#x5C#xA#xD]) | ECHAR )* "'"
 #STRING_LITERAL1 = Literal("'") + ZeroOrMore( Regex(u'[^\u0027\u005C\u000A\u000D]',flags=re.U) | ECHAR ) + "'"
@@ -270,8 +269,7 @@ STRING_LITERAL_LONG2.setParseAction(
 STRING_LITERAL1 = Regex(
     ur"'(?:[^'\n\r\\]|\\['ntbrf\\])*'(?!')", flags=re.U)
 STRING_LITERAL1.setParseAction(
-    lambda x: rdflib.Literal(x[0][1:-1].decode('string-escape')
-                if not rdflib.py3compat.PY3 else x[0][1:-1]))
+    lambda x: rdflib.Literal(decodeStringEscape(x[0][1:-1])))
 
 # [157] STRING_LITERAL2 ::= '"' ( ([^#x22#x5C#xA#xD]) | ECHAR )* '"'
 #STRING_LITERAL2 = Literal('"') + ZeroOrMore ( Regex(u'[^\u0022\u005C\u000A\u000D]',flags=re.U) | ECHAR ) + '"'
@@ -279,8 +277,7 @@ STRING_LITERAL1.setParseAction(
 STRING_LITERAL2 = Regex(
     ur'"(?:[^"\n\r\\]|\\["ntbrf\\])*"(?!")', flags=re.U)
 STRING_LITERAL2.setParseAction(
-    lambda x: rdflib.Literal(x[0][1:-1].decode('string-escape')
-                if not rdflib.py3compat.PY3 else x[0][1:-1]))
+    lambda x: rdflib.Literal(decodeStringEscape(x[0][1:-1])))
 
 # [161] NIL ::= '(' WS* ')'
 NIL = Literal('(') + ')'

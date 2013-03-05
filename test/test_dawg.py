@@ -6,10 +6,28 @@ import sys
 sys.setrecursionlimit(6000)  # default is 1000
 
 
-import collections
+try: 
+    from collections import Counter
+except: 
+
+    # cheap Counter impl for py 2.5
+    # not a complete implementation - only good enough for the use here!
+    from collections import defaultdict
+    from operator import itemgetter
+
+    class Counter(defaultdict): 
+        def __init__(self): 
+            defaultdict.__init__(self, int)
+        def most_common(self,N):
+            return [x[0] for x in sorted(self.items(), 
+                                         key=itemgetter(1), 
+                                         reverse=True)[:10]]
+    
+
 import datetime
 import isodate
-from StringIO import StringIO
+
+
 
 from rdflib import (
     ConjunctiveGraph, Graph, Namespace, RDF, RDFS, URIRef, BNode, Literal)
@@ -23,12 +41,23 @@ from rdflib_sparql.parser import parseQuery, parseUpdate
 from rdflib_sparql.results.rdfresults import RDFResultParser
 from rdflib_sparql.update import evalUpdate
 
+from rdflib_sparql.py3compat import decodeStringEscape
+
 from nose.tools import nottest, eq_ as eq
 from nose import SkipTest
 
 from urlparse import urljoin
 
+from StringIO import StringIO
+
+if sys.version_info[0:2]<(2,7):
+    from StringIO import StringIO as BytesIO
+else: 
+    from io import BytesIO
+    
+
 # do not resolve URIs looking for more data
+
 
 
 DEBUG_FAIL = True
@@ -38,7 +67,7 @@ DEBUG_ERROR = True
 DEBUG_ERROR = False
 
 SPARQL10Tests = True
-SPARQL10Tests = False
+#SPARQL10Tests = False
 
 SPARQL11Tests = True
 #SPARQL11Tests=False
@@ -57,8 +86,8 @@ EARL = Namespace("http://www.w3.org/ns/earl#")
 
 NAME = None
 
-fails = collections.Counter()
-errors = collections.Counter()
+fails = Counter()
+errors = Counter()
 
 failed_tests = []
 error_tests = []
@@ -88,6 +117,7 @@ def _fmt(f):
     if f.endswith(".rdf"):
         return "xml"
     return "turtle"
+
 
 
 def bindingsCompatible(a, b):
@@ -163,6 +193,9 @@ def update_test(t):
     rdflib_sparql_module.SPARQL_LOAD_GRAPHS = False
 
     uri, name, comment, data, graphdata, query, res, syntax = t
+
+    if uri in skiptests:
+        raise SkipTest()
 
     try:
         g = ConjunctiveGraph()
@@ -269,7 +302,7 @@ def update_test(t):
             except:
                 print "(parser error)"
 
-            print e.decode('string-escape')
+            print decodeStringEscape(unicode(e))
 
             import pdb
             pdb.post_mortem()
@@ -339,9 +372,12 @@ def query_test(t):
 
             # CSV is lossy, round-trip our own resultset to
             # lose the same info :)
-            s = StringIO()
+
+            # write bytes, read strings...
+            s = BytesIO()
             res2.serialize(s, format='csv')
-            s = StringIO(s.getvalue())  # hmm ?
+            print s.getvalue()
+            s = StringIO(s.getvalue().decode('utf-8'))  # hmm ?
             res2 = Result.parse(s, format='csv')
 
         else:
@@ -436,9 +472,7 @@ def query_test(t):
             except:
                 print "(parser error)"
 
-            #import traceback
-            #traceback.print_exc()
-            print e.decode('string-escape')
+            print decodeStringEscape(unicode(e))
 
             import pdb
             pdb.post_mortem()
@@ -645,8 +679,8 @@ if __name__ == '__main__':
         now = isodate.datetime_isoformat(datetime.datetime.utcnow())
 
         tf = open("testruns.txt", "a")
-        tf.write("%s\n%d tests, %d passed, %d failed, %d errors, %d " + \
-                 "skipped (%.2f%% success)\n\n" % (
+        tf.write("%s\n%d tests, %d passed, %d failed, %d errors, %d \
+                 skipped (%.2f%% success)\n\n" % (
                             now, i, success, f, e, skip, 100. * success / i))
         tf.close()
 

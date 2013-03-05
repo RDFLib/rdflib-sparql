@@ -25,9 +25,9 @@ PLUGIN_ENTRY_POINT = 'rdf.plugins.sparqleval'
 
 CUSTOM_EVALS = {}
 
-import parser
-import operators
-import parserutils
+import rdflib_sparql.parser as parser
+import rdflib_sparql.operators as operators
+import rdflib_sparql.parserutils as parserutils
 
 
 try:
