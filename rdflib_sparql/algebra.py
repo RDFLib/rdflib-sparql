@@ -674,7 +674,12 @@ def pprintAlgebra(q):
             print "%s%s =" % (ind, k,)
             pp(p[k], ind + "    ")
         print "%s)" % ind
-    pp(q.algebra)
+
+    try: 
+        pp(q.algebra)
+    except AttributeError: 
+        # it's update, just a list
+        for x in q: pp(x)
 
 if __name__ == '__main__':
     import sys

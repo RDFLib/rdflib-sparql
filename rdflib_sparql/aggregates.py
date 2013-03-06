@@ -1,7 +1,8 @@
-from rdflib import Literal
+from rdflib import Literal, XSD
 
 from rdflib_sparql.evalutils import _eval
 from rdflib_sparql.operators import numeric
+from rdflib_sparql.datatypes import type_promotion
 
 from decimal import Decimal
 
@@ -21,9 +22,16 @@ def _eval_rows(expr, group):
 def agg_Sum(a, group, bindings):
     c = 0
 
+    dt=None
     for x in group:
         try:
-            n = numeric(_eval(a.vars, x))
+            e = _eval(a.vars, x)
+            n = numeric(e)
+            if dt==None: 
+                dt=e.datatype
+            else: 
+                dt=type_promotion(dt, e.datatype)
+
             if type(c) == float and type(n)==Decimal: 
                 c+=float(n)
             elif type(n) == float and type(c)==Decimal:
@@ -33,8 +41,9 @@ def agg_Sum(a, group, bindings):
         except:
             pass  # simply dont count
 
-    bindings[a.res] = Literal(c)
+    bindings[a.res] = Literal(c, datatype=dt)
 
+# Perhaps TODO: keep datatype for max/min? 
 
 def agg_Min(a, group, bindings):
     m = None
@@ -105,25 +114,29 @@ def agg_Avg(a, group, bindings):
 
     c = 0
     s = 0
-    flt=False
+    dt=None
     for x in group:
         try:
-            n = numeric(_eval(a.vars, x))
+            e = _eval(a.vars, x)
+            n = numeric(e)
+            if dt==None: 
+                dt=e.datatype
+            else: 
+                dt=type_promotion(dt, e.datatype)
+
             if type(s) == float and type(n)==Decimal: 
                 s+=float(n)
             elif type(n) == float and type(s)==Decimal:
                 s=float(s)+n
-                flt=True
             else: 
                 s += n
             c += 1
         except:
             return # error in aggregate => no binding
-            pass  # simply dont count
 
     if c == 0:
         bindings[a.res] = Literal(0)
-    elif flt:
+    if dt==XSD.float or dt==XSD.double: 
         bindings[a.res] = Literal(s/c)
     else: 
         bindings[a.res] = Literal(Decimal(s) / Decimal(c))

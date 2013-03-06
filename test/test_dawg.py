@@ -56,9 +56,13 @@ else:
     from io import BytesIO
     
 
-# Several tests rely on lexical form of literals being kept!
+
 import rdflib
-rdflib.NORMALIZE_LITERALS=False
+# Several tests rely on lexical form of literals being kept!
+rdflib.NORMALIZE_LITERALS = False
+
+# we obviously need this
+rdflib.DAWG_LITERAL_COLLATION = True
 
 DEBUG_FAIL = True
 DEBUG_FAIL = False
@@ -337,8 +341,8 @@ def update_test(t):
             try:
                 pq = translateUpdate(parseUpdate(open(query[7:]).read()))
                 print "----------------- Parsed ------------------"
-                #pprintAlgebra(pq)
-                print pq
+                pprintAlgebra(pq)
+                #print pq
             except:
                 print "(parser error)"
 

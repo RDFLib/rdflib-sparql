@@ -20,6 +20,7 @@ import operator as pyop  # python operators
 import isodate
 
 from rdflib_sparql.parserutils import CompValue, Expr
+from rdflib_sparql.datatypes import XSD_DTs, type_promotion
 from rdflib import URIRef, BNode, Variable, Literal, XSD, RDF
 from rdflib.term import Node
 
@@ -699,27 +700,25 @@ def AdditiveExpression(e, ctx):
         return expr
 
     res = numeric(expr)
-    for op, e in zip(e.op, other):
-        e = numeric(e)
-        if isinstance(e, Decimal) and isinstance(res, float):
-            e = float(e)
-        if isinstance(e, float) and isinstance(res, Decimal):
+    
+    dt=expr.datatype
+
+    for op, term in zip(e.op, other):
+        n = numeric(term)
+        if isinstance(n, Decimal) and isinstance(res, float):
+            n = float(n)
+        if isinstance(n, float) and isinstance(res, Decimal):
             res = float(res)
 
+        dt=type_promotion(dt, term.datatype)
+
         if op == '+':
-            res += e
+            res += n
         else:
-            res -= e
+            res -= n
 
-    return Literal(res)
+    return Literal(res, datatype=dt)
 
-
-XSD_DTs = set(
-    (XSD.integer, XSD.decimal, XSD.float, XSD.double, XSD.string,
-     XSD.boolean, XSD.dateTime, XSD.nonPositiveInteger, XSD.negativeInteger,
-     XSD.long, XSD.int, XSD.short, XSD.byte, XSD.nonNegativeInteger,
-     XSD.unsignedLong, XSD.unsignedInt, XSD.unsignedShort, XSD.unsignedByte,
-     XSD.positiveInteger))
 
 
 def RelationalExpression(e, ctx):

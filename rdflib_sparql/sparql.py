@@ -237,12 +237,12 @@ class QueryContext(object):
             # being "loaded", just add it to the default-graph
             if default:
                 self._graph[-1] += self.dataset.get_context(source)
-            return
+        else: 
 
-        if default:
-            _load(self.graph, source)
-        else:
-            _load(self.dataset, source)
+            if default:
+                _load(self.graph, source)
+            else:
+                _load(self.dataset, source)
 
     def __getitem__(self, key):
         # in SPARQL BNodes are just labels
