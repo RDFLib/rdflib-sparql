@@ -1,7 +1,8 @@
-from rdflib import Literal
+from rdflib import Literal, XSD
 
 from rdflib_sparql.evalutils import _eval
 from rdflib_sparql.operators import numeric
+from rdflib_sparql.datatypes import type_promotion
 
 from decimal import Decimal
 
@@ -21,13 +22,28 @@ def _eval_rows(expr, group):
 def agg_Sum(a, group, bindings):
     c = 0
 
+    dt = None
     for x in group:
         try:
-            c += numeric(_eval(a.vars, x))
+            e = _eval(a.vars, x)
+            n = numeric(e)
+            if dt == None:
+                dt = e.datatype
+            else:
+                dt = type_promotion(dt, e.datatype)
+
+            if type(c) == float and type(n) == Decimal:
+                c += float(n)
+            elif type(n) == float and type(c) == Decimal:
+                c = float(c) + n
+            else:
+                c += n
         except:
             pass  # simply dont count
 
-    bindings[a.res] = Literal(c)
+    bindings[a.res] = Literal(c, datatype=dt)
+
+# Perhaps TODO: keep datatype for max/min?
 
 
 def agg_Min(a, group, bindings):
@@ -41,7 +57,7 @@ def agg_Min(a, group, bindings):
             else:
                 m = min(v, m)
         except:
-            pass  # simply dont count
+            return  # error in aggregate => no binding
 
     if m is not None:
         bindings[a.res] = Literal(m)
@@ -58,7 +74,7 @@ def agg_Max(a, group, bindings):
             else:
                 m = max(v, m)
         except:
-            pass  # simply dont count
+            return  # error in aggregate => no binding
 
     if m is not None:
         bindings[a.res] = Literal(m)
@@ -73,7 +89,8 @@ def agg_Count(a, group, bindings):
                 _eval(a.vars, x)
             c += 1
         except:
-            pass  # simply dont count
+            return  # error in aggregate => no binding
+            # pass  # simply dont count
 
     bindings[a.res] = Literal(c)
 
@@ -97,15 +114,30 @@ def agg_Avg(a, group, bindings):
 
     c = 0
     s = 0
+    dt = None
     for x in group:
         try:
-            s += numeric(_eval(a.vars, x))
+            e = _eval(a.vars, x)
+            n = numeric(e)
+            if dt == None:
+                dt = e.datatype
+            else:
+                dt = type_promotion(dt, e.datatype)
+
+            if type(s) == float and type(n) == Decimal:
+                s += float(n)
+            elif type(n) == float and type(s) == Decimal:
+                s = float(s) + n
+            else:
+                s += n
             c += 1
         except:
-            pass  # simply dont count
+            return  # error in aggregate => no binding
 
     if c == 0:
         bindings[a.res] = Literal(0)
+    if dt == XSD.float or dt == XSD.double:
+        bindings[a.res] = Literal(s / c)
     else:
         bindings[a.res] = Literal(Decimal(s) / Decimal(c))
 

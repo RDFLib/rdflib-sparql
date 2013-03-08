@@ -126,7 +126,7 @@ def evalLeftJoin(ctx, join):
 
 
 def evalFilter(ctx, part):
-    #import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
 
     # TODO: Deal with dict returned from evalPart!
 
@@ -137,7 +137,7 @@ def evalGraph(ctx, part):
 
     if ctx.dataset is None:
         raise Exception(
-            "Non-conjunctive-graph doesn't know about " + \
+            "Non-conjunctive-graph doesn't know about " +
             "graphs. Try a query without GRAPH.")
 
     ctx = ctx.clone()
@@ -233,7 +233,7 @@ def evalPart(ctx, part):
         raise Exception('DESCRIBE not implemented')
 
     else:
-        #import pdb ; pdb.set_trace()
+        # import pdb ; pdb.set_trace()
         raise Exception('I dont know: %s' % part.name)
 
 
@@ -255,7 +255,7 @@ def evalGroup(ctx, group):
 
 
 def evalAggregateJoin(ctx, agg):
-    #import pdb ; pdb.set_trace()
+    # import pdb ; pdb.set_trace()
     p = evalPart(ctx, agg.p)
     # p is always a Group, we always get a dict back
 
@@ -380,11 +380,11 @@ def evalQuery(graph, query, initBindings, base=None):
 
     main = query.algebra
 
-    #import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     if main.datasetClause:
         if ctx.dataset is None:
             raise Exception(
-                "Non-conjunctive-graph doesn't know about " + \
+                "Non-conjunctive-graph doesn't know about " +
                 "graphs! Try a query without FROM (NAMED).")
 
         ctx = ctx.clone()  # or push/pop?

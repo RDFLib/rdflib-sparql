@@ -83,7 +83,7 @@ class XMLResult(Result):
             self.vars = [Variable(x.get("name"))
                          for x in tree.findall(
                          './%shead/%svariable' % (
-                            RESULTS_NS_ET, RESULTS_NS_ET))]
+                             RESULTS_NS_ET, RESULTS_NS_ET))]
 
         elif type_ == 'ASK':
             self.askAnswer = boolean.text.lower().strip() == "true"

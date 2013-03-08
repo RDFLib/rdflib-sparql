@@ -26,7 +26,7 @@ def _graphAll(ctx, g):
         return [ctx.graph]
     elif g == 'NAMED':
         return [c for c in ctx.dataset.contexts()
-                    if c.identifier != ctx.graph.identifier]
+                if c.identifier != ctx.graph.identifier]
     elif g == 'ALL':
         return list(ctx.dataset.contexts())
     else:
@@ -261,7 +261,7 @@ def evalUpdate(graph, update, initBindings=None):
     for u in update:
 
         ctx = QueryContext(graph)
-        ctx.prologue=u.prologue
+        ctx.prologue = u.prologue
 
         if initBindings:
             for k, v in initBindings.iteritems():

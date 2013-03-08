@@ -544,7 +544,7 @@ class NegatedPath(Path):
             self.args = arg.args
         else:
             raise Exception(
-                'Can only negate URIRefs, InvPaths or ' + \
+                'Can only negate URIRefs, InvPaths or ' +
                 'AlternativePaths, not: %s' % (arg,))
 
     def eval(self, graph, subj=None, obj=None):

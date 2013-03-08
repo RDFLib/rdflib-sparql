@@ -6,27 +6,27 @@ import sys
 sys.setrecursionlimit(6000)  # default is 1000
 
 
-try: 
+try:
     from collections import Counter
-except: 
+except:
 
     # cheap Counter impl for py 2.5
     # not a complete implementation - only good enough for the use here!
     from collections import defaultdict
     from operator import itemgetter
 
-    class Counter(defaultdict): 
-        def __init__(self): 
+    class Counter(defaultdict):
+        def __init__(self):
             defaultdict.__init__(self, int)
-        def most_common(self,N):
-            return [x[0] for x in sorted(self.items(), 
-                                         key=itemgetter(1), 
+
+        def most_common(self, N):
+            return [x[0] for x in sorted(self.items(),
+                                         key=itemgetter(1),
                                          reverse=True)[:10]]
-    
+
 
 import datetime
 import isodate
-
 
 
 from rdflib import (
@@ -50,15 +50,18 @@ from urlparse import urljoin
 
 from StringIO import StringIO
 
-if sys.version_info[0:2]<(2,7):
+if sys.version_info[0:2] < (2, 7):
     from StringIO import StringIO as BytesIO
-else: 
+else:
     from io import BytesIO
-    
-
-# do not resolve URIs looking for more data
 
 
+import rdflib
+# Several tests rely on lexical form of literals being kept!
+rdflib.NORMALIZE_LITERALS = False
+
+# we obviously need this
+rdflib.DAWG_LITERAL_COLLATION = True
 
 DEBUG_FAIL = True
 DEBUG_FAIL = False
@@ -67,13 +70,13 @@ DEBUG_ERROR = True
 DEBUG_ERROR = False
 
 SPARQL10Tests = True
-#SPARQL10Tests = False
+# SPARQL10Tests = False
 
 SPARQL11Tests = True
-#SPARQL11Tests=False
+# SPARQL11Tests=False
 
 DETAILEDASSERT = True
-#DETAILEDASSERT=False
+# DETAILEDASSERT=False
 
 MF = Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#')
 QT = Namespace('http://www.w3.org/2001/sw/DataAccess/tests/test-query#')
@@ -119,6 +122,43 @@ def _fmt(f):
     return "turtle"
 
 
+def _bindingsTable(b):
+
+    def termString(t):
+        if t == None:
+            return "-"
+        return repr(t).replace('rdflib.term.', '').replace("datatype=URIRef(u'http://www.w3.org/2001/XMLSchema#", 'datatype=xsd:').replace("datatype=URIRef(u'", "datatype=")
+
+    def c(s, w):
+        """
+        center the string s in w wide string
+        """
+        h = (w - len(s)) / 2
+        return " " * h + s + " " * h
+
+    if not b:
+        return "(no results)\n"
+    else:
+        out = StringIO()
+        keys = set()
+        for r in b:
+            keys.update(r.keys())
+
+        keys = sorted(keys)
+        maxlen = [0] * len(keys)
+        b = [[termString(r.get(k)) for k in keys] for r in b]
+        for r in b:
+            for i in range(len(keys)):
+                maxlen[i] = max(maxlen[i], 1 + len(r[i]))
+
+        out.write(
+            "|".join([c(k, maxlen[i]) for i, k in enumerate(keys)]) + "\n")
+        out.write("-" * sum(maxlen) + "\n")
+        for r in sorted(b):
+            out.write("|".join(
+                [t + " " * (i - len(t) - 1) for i, t in zip(maxlen, r)]) + "\n")
+        return out.getvalue()
+
 
 def bindingsCompatible(a, b):
 
@@ -158,7 +198,12 @@ def bindingsCompatible(a, b):
                 else:
                     m[b1] = y[v1]
             else:
-                if y[v1] != b1:
+                 # if y[v1]!=b1:
+                 #    return False
+                try:
+                    if y[v1].neq(b1):
+                        return False
+                except TypeError:
                     return False
         return True
 
@@ -182,8 +227,8 @@ def pp_binding(solutions):
     Pretty print a single binding - for less eye-strain when debugging
     """
     return "\n[" + ",\n\t".join("{" + ", ".join("%s:%s" % (
-                x[0], x[1].n3()) for x in bindings.items()) + "}"
-                                    for bindings in solutions) + "]\n"
+        x[0], x[1].n3()) for x in bindings.items()) + "}"
+        for bindings in solutions) + "]\n"
 
 
 @nottest
@@ -235,9 +280,9 @@ def update_test(t):
 
         eq(set(x.identifier for x in g.contexts() if x != g.default_context),
            set(x.identifier for x in resg.contexts()
-                            if x != resg.default_context))
+               if x != resg.default_context))
         assert isomorphic(g.default_context, resg.default_context), \
-                        'Default graphs are not isomorphic'
+            'Default graphs are not isomorphic'
 
         for x in g.contexts():
             if x == g.default_context:
@@ -297,8 +342,8 @@ def update_test(t):
             try:
                 pq = translateUpdate(parseUpdate(open(query[7:]).read()))
                 print "----------------- Parsed ------------------"
-                #pprintAlgebra(pq)
-                print pq
+                pprintAlgebra(pq)
+                # print pq
             except:
                 print "(parser error)"
 
@@ -387,12 +432,13 @@ def query_test(t):
             eq(res.type, res2.type, 'Types do not match')
             if res.type == 'SELECT':
                 eq(set(res.vars), set(res2.vars), 'Vars do not match')
-                assert bindingsCompatible(
-                            set(frozenset(x.iteritems())
-                                for x in res.bindings),
-                            set(frozenset(x.iteritems())
-                                for x in res2.bindings)
-                            ), 'Bindings do not match'
+                comp = bindingsCompatible(
+                    set(frozenset(x.iteritems())
+                        for x in res.bindings),
+                    set(frozenset(x.iteritems())
+                        for x in res2.bindings)
+                )
+                assert comp, 'Bindings do not match'
             elif res.type == 'ASK':
                 eq(res.askAnswer, res2.askAnswer, 'Ask answer does not match')
             elif res.type in ('DESCRIBE', 'CONSTRUCT'):
@@ -407,22 +453,22 @@ def query_test(t):
             if res.type == 'SELECT':
                 eq(set(res.vars),
                    set(res2.vars), 'Vars do not match: %r != %r' % (
-                                        set(res.vars), set(res2.vars)))
+                   set(res.vars), set(res2.vars)))
                 assert bindingsCompatible(
-                        set(frozenset(x.iteritems())
-                                for x in res.bindings),
-                        set(frozenset(x.iteritems())
-                                for x in res2.bindings)
-                        ), 'Bindings do not match: %r != %r' % (
-                        pp_binding(res.bindings),
-                        pp_binding(res2.bindings))
+                    set(frozenset(x.iteritems())
+                        for x in res.bindings),
+                    set(frozenset(x.iteritems())
+                        for x in res2.bindings)
+                ), 'Bindings do not match: \n%s\n!=\n%s' % (
+                    _bindingsTable(res.bindings),
+                    _bindingsTable(res2.bindings))
             elif res.type == 'ASK':
                 eq(res.askAnswer,
                    res2.askAnswer, "Ask answer does not match: %r != %r" % (
-                                            res.askAnswer, res2.askAnswer))
+                   res.askAnswer, res2.askAnswer))
             elif res.type in ('DESCRIBE', 'CONSTRUCT'):
                 assert isomorphic(
-                    res.graph, res2.graph), 'graphs are no isomorphic!'
+                    res.graph, res2.graph), 'graphs are not isomorphic!'
             else:
                 raise Exception('Unknown result type: %s' % res.type)
 
@@ -476,8 +522,8 @@ def query_test(t):
 
             import pdb
             pdb.post_mortem()
-            #pdb.set_trace()
-            #nose.tools.set_trace()
+            # pdb.set_trace()
+            # nose.tools.set_trace()
         raise
 
 
@@ -503,7 +549,7 @@ def read_manifest(f):
 
                 if not ((e, DAWG.approval, DAWG.Approved) in g or
                         (e, DAWG.approval, DAWG.NotClassified) in g):
-                                continue
+                    continue
 
                 t = g.value(e, RDF.type)
 
@@ -671,7 +717,7 @@ if __name__ == '__main__':
 
     print "\n%d tests, %d passed, %d failed, %d errors, \
           %d skipped (%.2f%% success)" % (
-                    i, success, f, e, skip, 100. * success / i)
+        i, success, f, e, skip, 100. * success / i)
     print "Took %.2fs" % (time.time() - start)
 
     if not NAME:
@@ -681,7 +727,7 @@ if __name__ == '__main__':
         tf = open("testruns.txt", "a")
         tf.write("%s\n%d tests, %d passed, %d failed, %d errors, %d \
                  skipped (%.2f%% success)\n\n" % (
-                            now, i, success, f, e, skip, 100. * success / i))
+            now, i, success, f, e, skip, 100. * success / i))
         tf.close()
 
         earl_report = 'test_reports/earl_%s.ttl' % now

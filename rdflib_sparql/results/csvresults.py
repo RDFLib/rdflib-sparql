@@ -34,8 +34,8 @@ class CSVResultParser(ResultParser):
 
     def parseRow(self, row, v):
         return dict((var, val)
-                for var, val in zip(v, [self.convertTerm(t)
-                            for t in row]) if val is not None)
+                    for var, val in zip(v, [self.convertTerm(t)
+                                            for t in row]) if val is not None)
 
     def convertTerm(self, t):
         if t == "":
@@ -57,29 +57,30 @@ class CSVResultSerializer(ResultSerializer):
             raise Exception(
                 "CSVSerializer can only serialize select query results")
 
-    def serialize(self, stream, encoding='utf-8'):               
+    def serialize(self, stream, encoding='utf-8'):
 
-        if py3compat.PY3: 
+        if py3compat.PY3:
             # the serialiser writes bytes in the given encoding
-            # in py3 csv.writer is unicode aware and writes STRINGS, 
+            # in py3 csv.writer is unicode aware and writes STRINGS,
             # so we encode afterwards
-            # in py2 it breaks when passed unicode strings, 
+            # in py2 it breaks when passed unicode strings,
             # and must be passed utf8, so we encode before
-            
+
             import codecs
-            stream=codecs.getwriter(encoding)(stream)
+            stream = codecs.getwriter(encoding)(stream)
 
         out = csv.writer(stream, delimiter=self.delim)
 
         vs = [self.serializeTerm(v, encoding) for v in self.result.vars]
         out.writerow(vs)
         for row in self.result.bindings:
-            out.writerow([self.serializeTerm(row.get(v), encoding) for v in self.result.vars])
+            out.writerow([self.serializeTerm(
+                row.get(v), encoding) for v in self.result.vars])
 
     def serializeTerm(self, term, encoding):
         if term is None:
             return ""
         if not py3compat.PY3:
             return term.encode(encoding)
-        else: 
+        else:
             return term

@@ -73,16 +73,16 @@ def Group(p, expr=None):
 
 def _knownterms(triple):
     return len(filter(None, (isinstance(x, (Variable, BNode))
-                                                for x in triple)))
+                             for x in triple)))
 
 
 def triples(l):
     l = reduce(lambda x, y: x + y, l)
     if (len(l) % 3) != 0:
-        #import pdb ; pdb.set_trace()
+        # import pdb ; pdb.set_trace()
         raise Exception('these aint triples')
     return sorted([(l[x], l[x + 1], l[x + 2])
-                    for x in range(0, len(l), 3)], key=_knownterms)
+                   for x in range(0, len(l), 3)], key=_knownterms)
 
 
 def translatePName(p, prologue):
@@ -336,7 +336,7 @@ def _aggs(e, A):
     replaces aggregates with variable references
     """
 
-    #TODO: nested Aggregates?
+    # TODO: nested Aggregates?
 
     if isinstance(e, CompValue) and e.name.startswith('Aggregate_'):
         A.append(e)
@@ -381,7 +381,7 @@ def translateAggregates(q, M):
     E = []
     A = []
 
-    #import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
 
     # collect/replace aggs in :
     #    select expr as ?var
@@ -440,7 +440,7 @@ def translate(q):
 
     """
 
-    #import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     _traverse(q, _simplifyFilters)
 
     q.where = traverse(q.where, visitPost=translatePath)
@@ -467,7 +467,7 @@ def translate(q):
     elif traverse(q.having, _hasAggregate, complete=False) or \
             traverse(q.orderby, _hasAggregate, complete=False) or \
             any(traverse(x, _hasAggregate, complete=False)
-                                        for x in q.expr or []):
+                for x in q.expr or []):
         # if any aggregate is used, implicit group by
         M = Group(p=M)
         aggregate = True
@@ -599,7 +599,7 @@ def translateUpdate1(u, prologue):
     else:
         raise Exception('Unknown type of update operation: %s' % u)
 
-    u.prologue=prologue
+    u.prologue = prologue
     return u
 
 
@@ -674,7 +674,13 @@ def pprintAlgebra(q):
             print "%s%s =" % (ind, k,)
             pp(p[k], ind + "    ")
         print "%s)" % ind
-    pp(q.algebra)
+
+    try:
+        pp(q.algebra)
+    except AttributeError:
+        # it's update, just a list
+        for x in q:
+            pp(x)
 
 if __name__ == '__main__':
     import sys

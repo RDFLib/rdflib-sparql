@@ -228,6 +228,7 @@ DOUBLE.setParseAction(
 
 # [149] INTEGER_POSITIVE ::= '+' INTEGER
 INTEGER_POSITIVE = Suppress('+') + INTEGER.copy().leaveWhitespace()
+INTEGER_POSITIVE.setParseAction(lambda x: rdflib.Literal("+"+x[0], datatype=rdflib.XSD.integer))
 
 # [150] DECIMAL_POSITIVE ::= '+' DECIMAL
 DECIMAL_POSITIVE = Suppress('+') + DECIMAL.copy().leaveWhitespace()
