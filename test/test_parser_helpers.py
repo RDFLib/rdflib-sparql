@@ -13,7 +13,7 @@ def test_1():
     print t0, len(t0)
     assert len(t0) % 3 == 0
 
-    #t=BlankNodePropertyList.parseString("[ :p ?o ]")
+    # t=BlankNodePropertyList.parseString("[ :p ?o ]")
     t1 = TriplesSameSubject.parseString("[ ?p ?o ]")
     print t1, len(t1)
     assert len(t1) % 3 == 0

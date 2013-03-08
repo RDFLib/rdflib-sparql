@@ -8,7 +8,8 @@ from rdflib import Variable, BNode, Graph, ConjunctiveGraph, URIRef, Literal
 from parserutils import CompValue
 
 import rdflib_sparql
-from rdflib_sparql.compat import Mapping,MutableMapping
+from rdflib_sparql.compat import Mapping, MutableMapping
+
 
 class SPARQLError(Exception):
     def __init__(self, msg=None):
@@ -121,7 +122,7 @@ class FrozenBindings(Mapping):
 
     def project(self, vars):
         return FrozenBindings(
-                self.ctx, (x for x in self.iteritems() if x[0] in vars))
+            self.ctx, (x for x in self.iteritems() if x[0] in vars))
 
     def disjointDomain(self, other):
         return not bool(set(self).intersection(other))
@@ -207,8 +208,8 @@ class QueryContext(object):
     def _get_dataset(self):
         if self._dataset is None:
             raise Exception(
-                'You performed a query operation requiring ' + \
-                'a dataset (i.e. ConjunctiveGraph), but ' + \
+                'You performed a query operation requiring ' +
+                'a dataset (i.e. ConjunctiveGraph), but ' +
                 'operating currently on a single graph.')
         return self._dataset
 
@@ -230,14 +231,14 @@ class QueryContext(object):
             except:
                 raise Exception(
                     "Could not load %s as either RDF/XML, N3 or NTriples" % (
-                                                                    source))
+                    source))
 
         if not rdflib_sparql.SPARQL_LOAD_GRAPHS:
             # we are not loading - if we already know the graph
             # being "loaded", just add it to the default-graph
             if default:
                 self._graph[-1] += self.dataset.get_context(source)
-        else: 
+        else:
 
             if default:
                 _load(self.graph, source)
@@ -265,9 +266,9 @@ class QueryContext(object):
         """
         if vars:
             return FrozenBindings(
-                    self, ((k, v)
-                        for k, v in self.bindings.iteritems()
-                                                    if k in vars))
+                self, ((k, v)
+                       for k, v in self.bindings.iteritems()
+                       if k in vars))
         else:
             return FrozenBindings(self, self.bindings.iteritems())
 
@@ -326,8 +327,8 @@ class Prologue:
                 return self.resolvePName(iri.prefix, iri.localname)
             if iri.name == 'literal':
                 return Literal(
-                            iri.string, lang=iri.lang,
-                             datatype=self.absolutize(iri.datatype))
+                    iri.string, lang=iri.lang,
+                    datatype=self.absolutize(iri.datatype))
         elif isinstance(iri, URIRef) and not ':' in iri:  # TODO: Check for relative URI?
             return URIRef(self.base + iri)
         return iri

@@ -166,7 +166,7 @@ def Builtin_CEIL(expr, ctx):
     http://www.w3.org/TR/sparql11-query/#func-ceil
     """
 
-    l=expr.arg
+    l = expr.arg
     return Literal(int(math.ceil(numeric(l))), datatype=l.datatype)
 
 
@@ -174,7 +174,7 @@ def Builtin_FLOOR(expr, ctx):
     """
     http://www.w3.org/TR/sparql11-query/#func-floor
     """
-    l=expr.arg
+    l = expr.arg
     return Literal(int(math.floor(numeric(l))), datatype=l.datatype)
 
 
@@ -184,12 +184,12 @@ def Builtin_ROUND(expr, ctx):
     """
 
     # This used to be just math.bound
-    # but in py3k bound was changed to 
+    # but in py3k bound was changed to
     # "round-to-even" behaviour
     # this is an ugly work-around
-    l=expr.arg
-    v=numeric(l)
-    v=int(Decimal(v).quantize(1, ROUND_HALF_UP))
+    l = expr.arg
+    v = numeric(l)
+    v = int(Decimal(v).quantize(1, ROUND_HALF_UP))
     return Literal(v, datatype=l.datatype)
 
 
@@ -299,7 +299,7 @@ def Builtin_CONCAT(expr, ctx):
     lang = lang.pop() if len(lang) == 1 else None
 
     return Literal("".join(string(x)
-                    for x in expr.arg), datatype=dt, lang=lang)
+                           for x in expr.arg), datatype=dt, lang=lang)
 
 
 def _compatibleStrings(a, b):
@@ -609,20 +609,19 @@ def Function(e, ctx):
         if x.datatype == XSD.dateTime:
             raise SPARQLError("Cannot cast XSD.dateTime to %s" % e.iri)
 
-        if e.iri in (XSD.float, XSD.double): 
+        if e.iri in (XSD.float, XSD.double):
             try:
                 return Literal(float(x), datatype=e.iri)
             except:
                 raise SPARQLError("Cannot interpret '%s' as float" % x)
 
-        elif e.iri == XSD.decimal: 
-            if "e" in x or "E" in x: # SPARQL/XSD does not allow exponents in decimals
+        elif e.iri == XSD.decimal:
+            if "e" in x or "E" in x:  # SPARQL/XSD does not allow exponents in decimals
                 raise SPARQLError("Cannot interpret '%s' as decimal" % x)
             try:
                 return Literal(Decimal(x), datatype=e.iri)
             except:
                 raise SPARQLError("Cannot interpret '%s' as decimal" % x)
-            
 
         elif e.iri == XSD.integer:
             try:
@@ -676,8 +675,8 @@ def MultiplicativeExpression(e, ctx):
         for op, f in zip(e.op, other):
             f = numeric(f)
 
-            if type(f)==float: 
-                res=float(res)
+            if type(f) == float:
+                res = float(res)
 
             if op == '*':
                 res *= f
@@ -700,8 +699,8 @@ def AdditiveExpression(e, ctx):
         return expr
 
     res = numeric(expr)
-    
-    dt=expr.datatype
+
+    dt = expr.datatype
 
     for op, term in zip(e.op, other):
         n = numeric(term)
@@ -710,7 +709,7 @@ def AdditiveExpression(e, ctx):
         if isinstance(n, float) and isinstance(res, Decimal):
             res = float(res)
 
-        dt=type_promotion(dt, term.datatype)
+        dt = type_promotion(dt, term.datatype)
 
         if op == '+':
             res += n
@@ -718,7 +717,6 @@ def AdditiveExpression(e, ctx):
             res -= n
 
     return Literal(res, datatype=dt)
-
 
 
 def RelationalExpression(e, ctx):
@@ -732,18 +730,18 @@ def RelationalExpression(e, ctx):
     if other is None:
         return expr
 
-    ops = dict([('>', lambda x,y: x.__gt__(y)),
-                ('<', lambda x,y: x.__lt__(y)),
-                ('=', lambda x,y: x.eq(y)),
-                ('!=', lambda x,y: x.neq(y)),
-                ('>=', lambda x,y: x.__ge__(y)),
-                ('<=', lambda x,y: x.__le__(y)),
+    ops = dict([('>', lambda x, y: x.__gt__(y)),
+                ('<', lambda x, y: x.__lt__(y)),
+                ('=', lambda x, y: x.eq(y)),
+                ('!=', lambda x, y: x.neq(y)),
+                ('>=', lambda x, y: x.__ge__(y)),
+                ('<=', lambda x, y: x.__le__(y)),
                 ('IN', pyop.contains),
                 ('NOT IN', lambda x, y: not pyop.contains(x, y))])
 
     if op in ('IN', 'NOT IN'):
 
-        res = ( op == 'NOT IN' ) 
+        res = (op == 'NOT IN')
 
         error = False
 
@@ -764,12 +762,12 @@ def RelationalExpression(e, ctx):
     if not op in ('=', '!=', 'IN', 'NOT IN'):
         if not isinstance(expr, Literal):
             raise SPARQLError(
-                "Compare other than =, != of non-literals is an error: %s" % \
-                    expr)
+                "Compare other than =, != of non-literals is an error: %s" %
+                expr)
         if not isinstance(other, Literal):
             raise SPARQLError(
-                "Compare other than =, != of non-literals is an error: %s" % \
-                    other)
+                "Compare other than =, != of non-literals is an error: %s" %
+                other)
     else:
         if not isinstance(expr, Node):
             raise SPARQLError('I cannot compare this non-node: %s' % expr)
@@ -778,18 +776,20 @@ def RelationalExpression(e, ctx):
 
     if isinstance(expr, Literal) and isinstance(other, Literal):
 
-        if expr.datatype!=None and expr.datatype not in XSD_DTs and other.datatype!=None and other.datatype not in XSD_DTs:
-            # in SPARQL for non-XSD DT Literals we can only do =,!= 
-            if op not in ('=', '!='): 
-                raise SPARQLError('Can only do =,!= comparisons of non-XSD Literals')
+        if expr.datatype != None and expr.datatype not in XSD_DTs and other.datatype != None and other.datatype not in XSD_DTs:
+            # in SPARQL for non-XSD DT Literals we can only do =,!=
+            if op not in ('=', '!='):
+                raise SPARQLError(
+                    'Can only do =,!= comparisons of non-XSD Literals')
 
-    try: 
-        r=ops[op](expr, other)
-        if r==NotImplemented: 
+    try:
+        r = ops[op](expr, other)
+        if r == NotImplemented:
             raise SPARQLError('Error when comparing')
-    except TypeError, te: 
+    except TypeError, te:
         raise SPARQLError(te.message)
     return Literal(r)
+
 
 def ConditionalAndExpression(e, ctx):
 
@@ -860,7 +860,7 @@ def simplify(expr):
 
     for k in expr.keys():
         expr[k] = simplify(expr[k])
-        #expr['expr']=simplify(expr.expr)
+        # expr['expr']=simplify(expr.expr)
         #    expr['other']=simplify(expr.other)
 
     return expr
@@ -943,7 +943,7 @@ def EBV(rt):
             pyRT = rt.toPython()
 
             if isinstance(pyRT, Literal):
-                #Type error, see: http://www.w3.org/TR/rdf-sparql-query/#ebv
+                # Type error, see: http://www.w3.org/TR/rdf-sparql-query/#ebv
                 raise SPARQLTypeError(
                     "http://www.w3.org/TR/rdf-sparql-query/#ebv - ' + \
                     'Could not determine the EBV for : %s" % rt)

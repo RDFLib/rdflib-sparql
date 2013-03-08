@@ -167,12 +167,12 @@ class CompValue(OrderedDict):
 
     def __getattr__(self, a):
         # Hack hack: OrderedDict relies on this
-        if a in ( '_OrderedDict__root', '_OrderedDict__end'):
+        if a in ('_OrderedDict__root', '_OrderedDict__end'):
             raise AttributeError
         try:
             return self[a]
         except KeyError:
-            #raise AttributeError('no such attribute '+a)
+            # raise AttributeError('no such attribute '+a)
             return None
 
 
@@ -228,8 +228,8 @@ class Comp(TokenConverter):
                     res[t.name].append(t.tokenList)
                 else:
                     res[t.name] = t.tokenList
-                #res.append(t.tokenList)
-            #if isinstance(t,CompValue):
+                # res.append(t.tokenList)
+            # if isinstance(t,CompValue):
             #    res.update(t)
         return res
 

@@ -23,9 +23,9 @@ ParserElement.setDefaultWhitespaceChars(" \n")
 String = STRING_LITERAL1 | STRING_LITERAL2
 
 RDFLITERAL = Comp('literal', Param('string', String) + Optional(
-                    Param('lang', LANGTAG.leaveWhitespace()
-                        ) | Literal('^^').leaveWhitespace(
-                        ) + Param('datatype', IRIREF).leaveWhitespace()))
+    Param('lang', LANGTAG.leaveWhitespace()
+          ) | Literal('^^').leaveWhitespace(
+          ) + Param('datatype', IRIREF).leaveWhitespace()))
 
 TERM = RDFLITERAL | IRIREF | BLANK_NODE_LABEL | NumericLiteral | BooleanLiteral
 ROW = TERM + ZeroOrMore(Suppress("\t") + TERM)
@@ -78,4 +78,4 @@ if __name__ == '__main__':
     r = Result.parse(file(sys.argv[1]), format='tsv')
     print r.vars
     print r.bindings
-    #print r.serialize(format='json')
+    # print r.serialize(format='json')
