@@ -350,7 +350,7 @@ def update_test(t):
             print decodeStringEscape(unicode(e))
 
             import pdb
-            pdb.post_mortem()
+            pdb.post_mortem(sys.exc_info()[2])
         raise
 
 
@@ -521,7 +521,7 @@ def query_test(t):
             print decodeStringEscape(unicode(e))
 
             import pdb
-            pdb.post_mortem()
+            pdb.post_mortem(sys.exc_info()[2])
             # pdb.set_trace()
             # nose.tools.set_trace()
         raise
