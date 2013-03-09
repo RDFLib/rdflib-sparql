@@ -1,2 +1,2 @@
 isodate
-rdflib>=3.0
+https://github.com/RDFLib/rdflib/archive/master.zip
