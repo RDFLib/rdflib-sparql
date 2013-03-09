@@ -787,7 +787,7 @@ def RelationalExpression(e, ctx):
         if r == NotImplemented:
             raise SPARQLError('Error when comparing')
     except TypeError, te:
-        raise SPARQLError(te.message)
+        raise SPARQLError(*te.args)
     return Literal(r)
 
 
