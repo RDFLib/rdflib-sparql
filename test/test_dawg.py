@@ -98,7 +98,7 @@ error_tests = []
 EARL_REPORT = Graph()
 
 
-rdflib_sparql = URIRef('https://github.com/gromgull/rdflib-sparql')
+rdflib_sparql = URIRef('https://github.com/RDFLib/rdflib-sparql')
 
 EARL_REPORT.add((rdflib_sparql, DOAP.homepage, rdflib_sparql))
 EARL_REPORT.add((rdflib_sparql, DOAP.name, Literal("rdflib_sparql")))
