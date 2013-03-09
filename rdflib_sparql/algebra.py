@@ -520,10 +520,10 @@ def translate(q):
 
     if q.limitoffset:
         offset = 0
-        if q.limitoffset.offset:
+        if q.limitoffset.offset!=None:
             offset = q.limitoffset.offset.toPython()
 
-        if q.limitoffset.limit:
+        if q.limitoffset.limit!=None:
             M = CompValue('Slice', p=M, start=offset,
                           length=q.limitoffset.limit.toPython())
         else:
