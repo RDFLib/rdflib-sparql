@@ -6,8 +6,12 @@ try:
     from collections import Mapping, MutableMapping  # was added in 2.6
 
 except:
-    from UserDict import DictMixin as MutableMapping  # hmm
-    from UserDict import DictMixin as Mapping  # this wont be readonly
+    from UserDict import DictMixin
+    class MutableMapping(DictMixin): 
+        def keys(self): 
+            return list(self)
+        
+    Mapping=MutableMapping  
 
 
 try:
