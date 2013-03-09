@@ -4,6 +4,8 @@ from rdflib_sparql.evalutils import _eval
 from rdflib_sparql.operators import numeric
 from rdflib_sparql.datatypes import type_promotion
 
+from rdflib_sparql.compat import num_max,num_min
+
 from decimal import Decimal
 
 """
@@ -55,7 +57,7 @@ def agg_Min(a, group, bindings):
             if m is None:
                 m = v
             else:
-                m = min(v, m)
+                m = num_min(v, m)
         except:
             return  # error in aggregate => no binding
 
@@ -72,7 +74,7 @@ def agg_Max(a, group, bindings):
             if m is None:
                 m = v
             else:
-                m = max(v, m)
+                m = num_max(v, m)
         except:
             return  # error in aggregate => no binding
 
