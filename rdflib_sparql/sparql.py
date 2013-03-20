@@ -182,7 +182,10 @@ class QueryContext(object):
         self.bindings = Bindings()
         if isinstance(graph, ConjunctiveGraph):
             self._dataset = graph
-            self._graph = [self.dataset.default_context]
+            if rdflib_sparql.SPARQL_DEFAULT_GRAPH_UNION:
+                self._graph = [self.dataset]
+            else:
+                self._graph = [self.dataset.default_context]
         else:
             self._dataset = None
             self._graph = [graph]
