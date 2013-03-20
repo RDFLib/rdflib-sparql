@@ -349,7 +349,7 @@ No vars specified
 """
 
 
-from rdflib import URIRef, Graph, Namespace
+from rdflib import URIRef, Graph, ConjunctiveGraph, Namespace
 
 DEBUG = True
 
@@ -585,7 +585,7 @@ def evalPath(graph, t):
     return ((s, o) for s, p, o in graph.triples(t))
 
 
-def graph_triples(graph, t):
+def graph_triples(graph, t, context=None):
 #    if DEBUG: print ">>>",t
     subj, path, obj = t
     if path is None or isinstance(path, URIRef):
@@ -593,7 +593,20 @@ def graph_triples(graph, t):
     elif isinstance(path, Path):
         return ((s, path, o) for s, o in path.eval(graph, subj, obj))
     else:
-        raise Exception('wtf? %s' % path)
+        raise Exception('I need a URIRef or path as predicate, not %s' % path)
+
+def conjunctive_graph_triples(graph, t, context=None):
+
+    subj, path, obj = t
+    if path is None or isinstance(path, URIRef):
+        return graph._triples((subj, path, obj), context)
+    elif isinstance(path, Path):
+        if context is None:
+            return ((s, path, o) for s, o in path.eval(graph, subj, obj))
+        else:
+            return ((s, path, o) for s, o in path.eval(graph.get_context(context), subj, obj))
+    else:
+        raise Exception('I need a URIRef or path as predicate, not %s' % path)
 
 
 URIRef.__or__ = path_alternative
@@ -610,7 +623,8 @@ Path.__div__ = path_sequence
 
 Graph._triples = Graph.triples
 Graph.triples = graph_triples
-
+ConjunctiveGraph._triples=ConjunctiveGraph.triples
+ConjunctiveGraph.triples=conjunctive_graph_triples
 
 if __name__ == '__main__':
 
