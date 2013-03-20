@@ -57,8 +57,12 @@ else:
 
 
 import rdflib
+import rdflib_sparql
 # Several tests rely on lexical form of literals being kept!
 rdflib.NORMALIZE_LITERALS = False
+
+# we need an explicit default graph
+rdflib_sparql.SPARQL_DEFAULT_GRAPH_UNION=False
 
 # we obviously need this
 rdflib.DAWG_LITERAL_COLLATION = True
