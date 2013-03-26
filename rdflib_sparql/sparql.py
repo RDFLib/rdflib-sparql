@@ -148,7 +148,7 @@ class FrozenDict(Mapping):
 class FrozenBindings(FrozenDict):
 
     def __init__(self, ctx, *args, **kwargs):
-        FrozenBindings.__init__(self, *args, **kwargs)
+        FrozenDict.__init__(self, *args, **kwargs)
         self.ctx = ctx
 
     def __getitem__(self, key):
