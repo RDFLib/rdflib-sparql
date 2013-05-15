@@ -1,3 +1,14 @@
+#NOTE
+```
+rdflib-sparql was merged into core rdflib on 2013-05-01 
+
+Future development will happen in core rdflib. 
+
+If you are using an older RDFLib, you are most interested in the 
+no-lit-fix branch: https://github.com/RDFLib/rdflib-sparql/tree/no-lit-fix
+```
+
+
 RDFLib-SPARQL
 =============
 
